@@ -13,7 +13,7 @@ load_dotenv()
 @dataclass(frozen=True)
 class Settings:
     app_timezone: str = os.getenv("APP_TIMEZONE", "Asia/Seoul")
-    database_path: Path = Path(os.getenv("DATABASE_PATH", "data/personal_assistant.db"))
+    database_path: Path = Path(os.getenv("DATABASE_PATH", "data/personal_assistant_pc.db"))
     google_calendar_id: str = os.getenv("GOOGLE_CALENDAR_ID", "primary")
     google_service_account_file: str = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
@@ -29,4 +29,3 @@ class Settings:
 
 
 settings = Settings()
-
