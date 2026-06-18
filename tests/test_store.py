@@ -27,3 +27,31 @@ def test_add_list_update_delete_event(tmp_path) -> None:
     store.delete_event(event.id)
     assert store.list_events(include_past=True) == []
 
+
+def test_upsert_google_event_updates_existing_event(tmp_path) -> None:
+    store = ScheduleStore(tmp_path / "assistant.db")
+    start_at = datetime.now() + timedelta(days=1)
+    first = store.upsert_google_event(
+        ScheduleEvent(
+            id=None,
+            title="Google 일정",
+            start_at=start_at,
+            end_at=start_at + timedelta(hours=1),
+            google_event_id="google-1",
+        )
+    )
+
+    second = store.upsert_google_event(
+        ScheduleEvent(
+            id=None,
+            title="변경된 Google 일정",
+            start_at=start_at + timedelta(hours=2),
+            end_at=start_at + timedelta(hours=3),
+            google_event_id="google-1",
+        )
+    )
+
+    events = store.list_events(include_past=True)
+    assert first.id == second.id
+    assert len(events) == 1
+    assert events[0].title == "변경된 Google 일정"

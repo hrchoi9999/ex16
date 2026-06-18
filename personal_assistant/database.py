@@ -64,6 +64,26 @@ class ScheduleStore:
             event.id = int(cursor.lastrowid)
             return event
 
+    def upsert_google_event(self, event: ScheduleEvent) -> ScheduleEvent:
+        if not event.google_event_id:
+            return self.add_event(event)
+
+        existing = self.get_event_by_google_id(event.google_event_id)
+        if existing is None:
+            return self.add_event(event)
+
+        updated = self.update_event(
+            int(existing.id),
+            title=event.title,
+            start_at=event.start_at,
+            end_at=event.end_at,
+            description=event.description,
+            location=event.location,
+            importance=event.importance,
+            google_event_id=event.google_event_id,
+        )
+        return updated if updated is not None else event
+
     def list_events(self, include_past: bool = False) -> list[ScheduleEvent]:
         query = "SELECT * FROM events"
         params: tuple[str, ...] = ()
@@ -110,6 +130,14 @@ class ScheduleStore:
             row = connection.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
         return self._row_to_event(row) if row else None
 
+    def get_event_by_google_id(self, google_event_id: str) -> ScheduleEvent | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM events WHERE google_event_id = ?",
+                (google_event_id,),
+            ).fetchone()
+        return self._row_to_event(row) if row else None
+
     def upcoming_important(self, hours: int = 24) -> list[ScheduleEvent]:
         now = datetime.now()
         until = now + timedelta(hours=hours)
@@ -148,4 +176,3 @@ def seed_sample_events(store: ScheduleStore, events: Iterable[ScheduleEvent]) ->
         return
     for event in events:
         store.add_event(event)
-

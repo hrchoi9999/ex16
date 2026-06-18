@@ -17,6 +17,10 @@ from personal_assistant.priority import recommend_priorities
 st.set_page_config(page_title="AI Scheduler", page_icon=":calendar:", layout="wide")
 
 
+VIEW_LABELS = {"day": "일", "week": "주", "month": "월"}
+WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
+
+
 @st.cache_resource
 def get_store() -> ScheduleStore:
     return ScheduleStore(settings.database_path)
@@ -31,6 +35,7 @@ def init_state() -> None:
     today = date.today()
     st.session_state.setdefault("selected_date", today)
     st.session_state.setdefault("view_mode", "week")
+    st.session_state.setdefault("sync_message", "")
 
 
 def inject_styles() -> None:
@@ -88,6 +93,16 @@ def inject_styles() -> None:
         .stButton > button {
             border-radius: .5rem !important;
             font-weight: 750 !important;
+            min-height: 2.45rem;
+        }
+        div[role="radiogroup"] {
+            gap: .35rem;
+        }
+        div[role="radiogroup"] label {
+            border: 1px solid var(--outline);
+            background: #fff;
+            border-radius: .5rem;
+            padding: .35rem .75rem;
         }
         .top-shell {
             height: 56px;
@@ -138,10 +153,15 @@ def inject_styles() -> None:
             color: var(--primary);
             font-weight: 850;
         }
+        .control-shell {
+            padding: 14px 24px 16px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--outline-soft);
+        }
         .workspace {
             display: grid;
             grid-template-columns: 250px minmax(460px, 1fr) 320px;
-            min-height: calc(100vh - 56px);
+            min-height: 650px;
             background: var(--surface);
         }
         .left-pane {
@@ -239,6 +259,9 @@ def inject_styles() -> None:
             border-radius: 999px;
             background: var(--success);
         }
+        .status-dot.off {
+            background: var(--outline);
+        }
         .mini-month {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -263,6 +286,9 @@ def inject_styles() -> None:
             background: var(--primary);
             color: #fff;
             font-weight: 850;
+        }
+        .mini-day.selected {
+            box-shadow: inset 0 0 0 2px var(--primary);
         }
         .mini-dot {
             position: absolute;
@@ -316,6 +342,11 @@ def inject_styles() -> None:
             color: var(--muted);
             margin: 4px 0 0;
         }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: 60px repeat(7, minmax(0, 1fr));
+            min-height: 560px;
+        }
         .day-header-grid {
             display: grid;
             grid-template-columns: 60px repeat(7, 1fr);
@@ -341,11 +372,6 @@ def inject_styles() -> None:
         .day-number.today {
             background: var(--primary);
             color: #fff;
-        }
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: 60px repeat(7, minmax(0, 1fr));
-            min-height: 520px;
         }
         .time-col {
             border-right: 1px solid var(--outline);
@@ -394,17 +420,85 @@ def inject_styles() -> None:
             background: rgba(67,70,85,.12);
         }
         .calendar-event-title {
-            font-family: var(--font-mono) !important;
             font-weight: 900;
             font-size: .72rem;
             line-height: 1.15;
             margin: 0 0 3px;
-            text-transform: uppercase;
         }
         .calendar-event-time {
             font-size: .68rem;
             margin: 0;
             opacity: .86;
+        }
+        .day-agenda {
+            padding: 20px 24px;
+            display: grid;
+            gap: 12px;
+        }
+        .agenda-item {
+            border: 1px solid var(--outline-soft);
+            border-left: 4px solid var(--primary-strong);
+            border-radius: .65rem;
+            padding: 14px 16px;
+            background: #fff;
+        }
+        .agenda-time {
+            color: var(--primary);
+            font-weight: 850;
+            font-size: .82rem;
+            margin: 0 0 4px;
+        }
+        .agenda-title {
+            font-weight: 850;
+            margin: 0 0 4px;
+        }
+        .month-view-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            border-top: 1px solid var(--outline-soft);
+            border-left: 1px solid var(--outline-soft);
+        }
+        .month-label {
+            padding: 10px;
+            background: var(--surface-low);
+            border-right: 1px solid var(--outline-soft);
+            border-bottom: 1px solid var(--outline-soft);
+            color: var(--muted);
+            font-weight: 850;
+            text-align: center;
+        }
+        .month-cell {
+            min-height: 112px;
+            padding: 9px;
+            border-right: 1px solid var(--outline-soft);
+            border-bottom: 1px solid var(--outline-soft);
+            background: #fff;
+        }
+        .month-cell.outside {
+            background: #f8fafc;
+            opacity: .58;
+        }
+        .month-cell.today {
+            box-shadow: inset 0 0 0 2px var(--primary);
+        }
+        .month-cell.selected {
+            background: rgba(37,99,235,.06);
+        }
+        .month-date {
+            font-weight: 850;
+            margin-bottom: 6px;
+        }
+        .month-event {
+            display: block;
+            padding: 3px 6px;
+            margin-top: 4px;
+            border-radius: .35rem;
+            background: rgba(37,99,235,.12);
+            color: var(--primary);
+            font-size: .7rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .assistant-card, .task-card, .insight-card {
             border: 1px solid var(--outline);
@@ -476,35 +570,78 @@ def inject_styles() -> None:
             }
         }
         </style>
-        """,
+        """
     )
-
-
-def events_for_day(events: list[ScheduleEvent], day: date) -> list[ScheduleEvent]:
-    return [event for event in events if event.start_at.date() == day]
 
 
 def week_start(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
 
+def add_months(day: date, months: int) -> date:
+    month_index = day.month - 1 + months
+    year = day.year + month_index // 12
+    month = month_index % 12 + 1
+    last_day = calendar.monthrange(year, month)[1]
+    return day.replace(year=year, month=month, day=min(day.day, last_day))
+
+
+def period_bounds(selected: date, view_mode: str) -> tuple[datetime, datetime]:
+    if view_mode == "day":
+        start = selected
+        end = selected + timedelta(days=1)
+    elif view_mode == "month":
+        start = selected.replace(day=1)
+        end = add_months(start, 1)
+    else:
+        start = week_start(selected)
+        end = start + timedelta(days=7)
+    return datetime.combine(start, time.min), datetime.combine(end, time.min)
+
+
+def shift_selected_date(direction: int) -> None:
+    selected = st.session_state.selected_date
+    view_mode = st.session_state.view_mode
+    if view_mode == "day":
+        st.session_state.selected_date = selected + timedelta(days=direction)
+    elif view_mode == "month":
+        st.session_state.selected_date = add_months(selected, direction)
+    else:
+        st.session_state.selected_date = selected + timedelta(days=7 * direction)
+
+
+def events_for_day(events: list[ScheduleEvent], day: date) -> list[ScheduleEvent]:
+    return [event for event in events if event.start_at.date() == day]
+
+
+def events_in_period(events: list[ScheduleEvent], start_at: datetime, end_at: datetime) -> list[ScheduleEvent]:
+    return [event for event in events if start_at <= event.start_at < end_at]
+
+
+def compact_title(title: str, limit: int = 42) -> str:
+    return title[:limit] + "..." if len(title) > limit else title
+
+
 def event_top_and_height(event: ScheduleEvent) -> tuple[int, int]:
-    start_hour = max(event.start_at.hour + event.start_at.minute / 60, 8)
+    start_hour = max(event.start_at.hour + event.start_at.minute / 60, 7)
     end_hour = max(event.end_at.hour + event.end_at.minute / 60, start_hour + 1)
-    top = int((start_hour - 8) * 64)
+    top = int((start_hour - 7) * 64)
     height = max(int((end_hour - start_hour) * 64), 48)
     return top, height
 
 
-def compact_title(title: str) -> str:
-    return title[:42] + "..." if len(title) > 42 else title
+def event_variant(event: ScheduleEvent) -> str:
+    if event.importance >= 5:
+        return "secondary"
+    if event.importance <= 2:
+        return "muted"
+    return ""
 
 
 def calendar_event_html(event: ScheduleEvent) -> str:
     top, height = event_top_and_height(event)
-    variant = "secondary" if event.importance >= 5 else "muted" if event.importance <= 2 else ""
     return f"""
-    <div class="calendar-event {variant}" style="top:{top}px;height:{height}px;">
+    <div class="calendar-event {event_variant(event)}" style="top:{top}px;height:{height}px;">
         <p class="calendar-event-title">{escape(compact_title(event.title))}</p>
         <p class="calendar-event-time">{escape(event.time_label)}</p>
     </div>
@@ -516,43 +653,131 @@ def render_week_calendar(events: list[ScheduleEvent], selected: date) -> str:
     days = [start + timedelta(days=i) for i in range(7)]
     today = date.today()
     header = ["<div></div>"]
-    for day in days:
+    for label, day in zip(WEEKDAY_LABELS, days, strict=True):
         today_class = " today" if day == today else ""
         header.append(
             f"""
             <div>
-                <p class="day-name">{day:%a}</p>
+                <p class="day-name">{label}</p>
                 <div class="day-number{today_class}">{day.day}</div>
             </div>
             """
         )
     time_col = "<div class='time-col'>" + "".join(
-        f"<div class='time-cell'>{hour:02d}:00</div>" for hour in range(8, 16)
+        f"<div class='time-cell'>{hour:02d}:00</div>" for hour in range(7, 21)
     ) + "</div>"
     day_cols = []
     for day in days:
         today_class = " today" if day == today else ""
-        body = "".join(calendar_event_html(event) for event in events_for_day(events, day)[:4])
+        body = "".join(calendar_event_html(event) for event in events_for_day(events, day)[:6])
         day_cols.append(f"<div class='day-col{today_class}'>{body}</div>")
     return f"""
     <section class="main-pane">
         <div class="calendar-head">
             <div class="calendar-toolbar">
                 <div>
-                    <h2 class="calendar-title">{selected:%Y년 %m월}</h2>
-                    <p class="calendar-subtitle">Week {selected.isocalendar().week} · 우선순위 중심 주간 일정</p>
+                    <h2 class="calendar-title">{start:%Y.%m.%d} - {(start + timedelta(days=6)):%m.%d}</h2>
+                    <p class="calendar-subtitle">Week {selected.isocalendar().week} · 주간 일정</p>
                 </div>
-                <div>
-                    <span class="tag">Today</span>
-                    <span class="tag">Previous</span>
-                    <span class="tag">Next</span>
-                </div>
+                <div><span class="tag">Week View</span><span class="tag">Google Sync</span></div>
             </div>
             <div class="day-header-grid">{''.join(header)}</div>
         </div>
         <div class="calendar-grid">{time_col}{''.join(day_cols)}</div>
     </section>
     """
+
+
+def render_day_calendar(events: list[ScheduleEvent], selected: date) -> str:
+    day_events = events_for_day(events, selected)
+    timeline = []
+    for hour in range(7, 21):
+        hour_events = [
+            event
+            for event in day_events
+            if event.start_at.hour <= hour < max(event.end_at.hour, event.start_at.hour + 1)
+        ]
+        items = "".join(
+            f"""
+            <div class="agenda-item">
+                <p class="agenda-time">{escape(event.time_label)}</p>
+                <p class="agenda-title">{escape(event.title)}</p>
+                <p class="task-meta">{escape(event.location or event.description or "개인 일정")}</p>
+            </div>
+            """
+            for event in hour_events
+        )
+        timeline.append(
+            f"""
+            <div class="agenda-item">
+                <p class="agenda-time">{hour:02d}:00</p>
+                {items or '<p class="task-meta">비어 있는 시간입니다.</p>'}
+            </div>
+            """
+        )
+    return f"""
+    <section class="main-pane">
+        <div class="calendar-head">
+            <div class="calendar-toolbar">
+                <div>
+                    <h2 class="calendar-title">{selected:%Y년 %m월 %d일}</h2>
+                    <p class="calendar-subtitle">Day View · 하루 단위 집중 일정</p>
+                </div>
+                <div><span class="tag">Day View</span><span class="tag">{len(day_events)} events</span></div>
+            </div>
+        </div>
+        <div class="day-agenda">{''.join(timeline)}</div>
+    </section>
+    """
+
+
+def render_month_calendar(events: list[ScheduleEvent], selected: date) -> str:
+    month = selected.replace(day=1)
+    weeks = calendar.Calendar(firstweekday=0).monthdatescalendar(month.year, month.month)
+    cells = [f"<div class='month-label'>{label}</div>" for label in WEEKDAY_LABELS]
+    for week in weeks:
+        for day in week:
+            classes = ["month-cell"]
+            if day.month != month.month:
+                classes.append("outside")
+            if day == date.today():
+                classes.append("today")
+            if day == selected:
+                classes.append("selected")
+            event_pills = "".join(
+                f"<span class='month-event'>{escape(compact_title(event.title, 18))}</span>"
+                for event in events_for_day(events, day)[:3]
+            )
+            cells.append(
+                f"""
+                <div class="{' '.join(classes)}">
+                    <div class="month-date">{day.day}</div>
+                    {event_pills}
+                </div>
+                """
+            )
+    return f"""
+    <section class="main-pane">
+        <div class="calendar-head">
+            <div class="calendar-toolbar">
+                <div>
+                    <h2 class="calendar-title">{selected:%Y년 %m월}</h2>
+                    <p class="calendar-subtitle">Month View · 월간 일정 요약</p>
+                </div>
+                <div><span class="tag">Month View</span><span class="tag">{len(events)} total</span></div>
+            </div>
+        </div>
+        <div class="month-view-grid">{''.join(cells)}</div>
+    </section>
+    """
+
+
+def render_calendar(events: list[ScheduleEvent], selected: date, view_mode: str) -> str:
+    if view_mode == "day":
+        return render_day_calendar(events, selected)
+    if view_mode == "month":
+        return render_month_calendar(events, selected)
+    return render_week_calendar(events, selected)
 
 
 def mini_month_html(events: list[ScheduleEvent], selected: date) -> str:
@@ -563,23 +788,81 @@ def mini_month_html(events: list[ScheduleEvent], selected: date) -> str:
         parts.append(f"<p class='mini-label'>{label}</p>")
     for week in calendar.Calendar(firstweekday=6).monthdatescalendar(month.year, month.month):
         for day in week:
-            muted = "opacity:.35;" if day.month != month.month else ""
-            today = " today" if day == date.today() else ""
+            style = "opacity:.35;" if day.month != month.month else ""
+            classes = ["mini-day"]
+            if day == date.today():
+                classes.append("today")
+            if day == selected:
+                classes.append("selected")
             dot = "<span class='mini-dot'></span>" if day in event_days else ""
-            parts.append(f"<div class='mini-day{today}' style='{muted}'>{day.day}{dot}</div>")
+            parts.append(f"<div class='{' '.join(classes)}' style='{style}'>{day.day}{dot}</div>")
     parts.append("</div>")
     return "".join(parts)
 
 
-def render_static_workspace(events: list[ScheduleEvent], alerts: list[ScheduleEvent], selected: date) -> None:
+def import_google_events() -> None:
+    start_at, end_at = period_bounds(st.session_state.selected_date, st.session_state.view_mode)
+    result = calendar_client.list_events(start_at, end_at)
+    if result.success:
+        for event in result.events:
+            store.upsert_google_event(event)
+        st.session_state.sync_message = result.message
+    else:
+        st.session_state.sync_message = result.message
+
+
+def render_control_bar() -> None:
+    st.html("<div class='control-shell'>")
+    nav_col, view_col, date_col, sync_col = st.columns([1.2, 1.15, 1.1, 1.35], gap="medium")
+    with nav_col:
+        prev_col, today_col, next_col = st.columns(3)
+        if prev_col.button("이전", use_container_width=True):
+            shift_selected_date(-1)
+        if today_col.button("오늘", use_container_width=True):
+            st.session_state.selected_date = date.today()
+        if next_col.button("다음", use_container_width=True):
+            shift_selected_date(1)
+    with view_col:
+        st.radio(
+            "캘린더 보기",
+            options=["day", "week", "month"],
+            format_func=lambda value: VIEW_LABELS[value],
+            horizontal=True,
+            key="view_mode",
+        )
+    with date_col:
+        picked = st.date_input("기준 날짜", value=st.session_state.selected_date)
+        if picked != st.session_state.selected_date:
+            st.session_state.selected_date = picked
+    with sync_col:
+        if st.button("Google Calendar 가져오기", type="primary", use_container_width=True):
+            import_google_events()
+            st.rerun()
+        if st.session_state.sync_message:
+            if "실패" in st.session_state.sync_message or "설정" in st.session_state.sync_message:
+                st.warning(st.session_state.sync_message)
+            else:
+                st.success(st.session_state.sync_message)
+    st.html("</div>")
+
+
+def render_static_workspace(
+    events: list[ScheduleEvent],
+    alerts: list[ScheduleEvent],
+    selected: date,
+    view_mode: str,
+) -> None:
+    start_at, end_at = period_bounds(selected, view_mode)
+    visible_events = events_in_period(events, start_at, end_at)
     today_events = events_for_day(events, date.today())
     recommendations = recommend_priorities([event for event in events if event.end_at >= datetime.now()])
     assistant_text = (
-        f"오늘 일정 {len(today_events)}개, 중요한 알림 {len(alerts)}개가 있습니다. "
-        "오전 집중 시간에는 우선순위가 높은 일정을 먼저 확인하세요."
+        f"현재 {VIEW_LABELS[view_mode]} 보기 범위에 일정 {len(visible_events)}개가 있습니다. "
+        f"오늘 일정은 {len(today_events)}개, 중요한 알림은 {len(alerts)}개입니다."
     )
     first_task = recommendations[0].event.title if recommendations else "새 일정을 등록해 보세요"
-    second_task = recommendations[1].event.title if len(recommendations) > 1 else "중요 일정 알림을 확인하세요"
+    second_task = recommendations[1].event.title if len(recommendations) > 1 else "Google Calendar 가져오기를 실행해 보세요"
+    google_status_class = "" if calendar_client.enabled else " off"
     html = f"""
     <div class="top-shell">
         <div class="brand">
@@ -587,7 +870,7 @@ def render_static_workspace(events: list[ScheduleEvent], alerts: list[ScheduleEv
             <h1 class="brand-title">AI Scheduler</h1>
         </div>
         <div class="search-pill">일정, 참석자, 프로젝트 검색</div>
-        <div class="search-pill">{date.today():%Y-%m-%d}</div>
+        <div class="search-pill">{selected:%Y-%m-%d}</div>
         <div style="text-align:center;color:var(--muted);font-size:1rem;">Bell</div>
         <div class="profile-chip">ME</div>
     </div>
@@ -600,23 +883,23 @@ def render_static_workspace(events: list[ScheduleEvent], alerts: list[ScheduleEv
                     <p class="identity-subtitle">PC Workspace</p>
                 </div>
             </div>
-            <div class="nav-item active">Week View</div>
-            <div class="nav-item">Day View</div>
-            <div class="nav-item">Month View</div>
+            <div class="nav-item {'active' if view_mode == 'week' else ''}">Week View</div>
+            <div class="nav-item {'active' if view_mode == 'day' else ''}">Day View</div>
+            <div class="nav-item {'active' if view_mode == 'month' else ''}">Month View</div>
             <p class="section-label">Integrations</p>
-            <div class="integration-row"><div class="integration-left"><div class="integration-icon">G</div><span>Google Calendar</span></div><span class="status-dot"></span></div>
-            <div class="integration-row"><div class="integration-left"><div class="integration-icon">AI</div><span>OpenAI / Gemini</span></div><span class="status-dot"></span></div>
+            <div class="integration-row"><div class="integration-left"><div class="integration-icon">G</div><span>Google Calendar</span></div><span class="status-dot{google_status_class}"></span></div>
+            <div class="integration-row"><div class="integration-left"><div class="integration-icon">AI</div><span>OpenAI / Gemini</span></div><span class="status-dot{' ' if settings.llm_enabled else ' off'}"></span></div>
             <div class="integration-row"><div class="integration-left"><div class="integration-icon">DB</div><span>SQLite Local</span></div><span class="status-dot"></span></div>
             <p class="section-label">Mini Calendar</p>
             <p style="font-weight:850;margin:0 0 8px;">{selected:%Y년 %m월}</p>
             {mini_month_html(events, selected)}
             <div class="storage-card">
-                <div class="storage-top"><span>Today</span><span>{len(today_events)}</span></div>
-                <div class="progress-track"><div class="progress-fill" style="width:{min(len(today_events) * 20, 100)}%"></div></div>
+                <div class="storage-top"><span>{VIEW_LABELS[view_mode]} 보기</span><span>{len(visible_events)}</span></div>
+                <div class="progress-track"><div class="progress-fill" style="width:{min(len(visible_events) * 12, 100)}%"></div></div>
                 <p class="identity-subtitle" style="font-size:.72rem;margin-top:8px;">중요 알림 {len(alerts)}개 · 전체 일정 {len(events)}개</p>
             </div>
         </aside>
-        {render_week_calendar(events, selected)}
+        {render_calendar(events, selected, view_mode)}
         <aside class="right-pane">
             <div class="assistant-card">
                 <p class="assistant-title">AI Smart Assistant</p>
@@ -658,16 +941,19 @@ def create_event_from_ai(command: str) -> None:
 
 def create_manual_event(title: str, start_date: date, start_time: time, duration: int, importance: int) -> None:
     start_at = datetime.combine(start_date, start_time)
-    store.add_event(
-        ScheduleEvent(
-            id=None,
-            title=title.strip(),
-            start_at=start_at,
-            end_at=start_at + timedelta(minutes=int(duration)),
-            importance=int(importance),
-        )
+    event = ScheduleEvent(
+        id=None,
+        title=title.strip(),
+        start_at=start_at,
+        end_at=start_at + timedelta(minutes=int(duration)),
+        importance=int(importance),
     )
+    sync_result = calendar_client.create_event(event)
+    if sync_result.google_event_id:
+        event.google_event_id = sync_result.google_event_id
+    store.add_event(event)
     st.success("일정을 등록했습니다.")
+    st.caption(sync_result.message)
 
 
 def render_interaction_panel(events: list[ScheduleEvent]) -> None:
@@ -689,8 +975,8 @@ def render_interaction_panel(events: list[ScheduleEvent]) -> None:
     with manual_col:
         st.markdown("#### 직접 등록")
         title = st.text_input("제목", placeholder="회의")
-        start_date = st.date_input("날짜", value=st.session_state.selected_date)
-        start_time = st.time_input("시작 시간", value=time(9, 0))
+        start_date = st.date_input("날짜", value=st.session_state.selected_date, key="manual_start_date")
+        start_time = st.time_input("시작 시간", value=time(9, 0), key="manual_start_time")
         duration = st.number_input("소요 시간(분)", 15, 480, 60, 15)
         importance = st.slider("중요도", 1, 5, 3)
         if st.button("일정 등록", type="primary", use_container_width=True):
@@ -712,16 +998,19 @@ def render_interaction_panel(events: list[ScheduleEvent]) -> None:
                     updated_importance = st.slider("중요도", 1, 5, event.importance, key=f"importance_{event.id}")
                     if st.form_submit_button("변경 저장", use_container_width=True):
                         start_at = datetime.combine(updated_date, updated_time)
-                        store.update_event(
+                        updated = store.update_event(
                             int(event.id),
                             title=updated_title.strip(),
                             start_at=start_at,
                             end_at=start_at + (event.end_at - event.start_at),
                             importance=int(updated_importance),
                         )
+                        if updated is not None:
+                            st.caption(calendar_client.update_event(updated).message)
                         st.success("일정을 변경했습니다.")
                         st.rerun()
                 if st.button("삭제", key=f"delete_{event.id}", use_container_width=True):
+                    st.caption(calendar_client.delete_event(event).message)
                     store.delete_event(int(event.id))
                     st.success("일정을 삭제했습니다.")
                     st.rerun()
@@ -733,7 +1022,8 @@ def main() -> None:
     inject_styles()
     all_events = store.list_events(include_past=True)
     alerts = store.upcoming_important()
-    render_static_workspace(all_events, alerts, st.session_state.selected_date)
+    render_control_bar()
+    render_static_workspace(all_events, alerts, st.session_state.selected_date, st.session_state.view_mode)
     render_interaction_panel(all_events)
     st.caption(
         "SQLite local-first · "
