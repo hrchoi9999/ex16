@@ -3,7 +3,7 @@
 ## Current Local URL
 
 - Streamlit app: http://localhost:8501
-- Verified at: 2026-06-18 17:18:05 +09:00
+- Verified at: 2026-06-18 17:29:40 +09:00
 
 ## Run Command
 
@@ -19,19 +19,18 @@ cd C:\AI_Agent\ex16
 - Test suite: `pytest` 4 passed
 - Import check: `python -c "import app; print('app import ok')"`
 - Browser interaction checks:
-  - `월` 보기 선택 시 월간 캘린더로 전환됨.
-  - `일` 보기 선택 시 하루 단위 일정 화면으로 전환됨.
-  - `다음` 버튼 클릭 시 현재 보기 모드를 유지한 채 기준 날짜만 이동함.
-  - `Google Calendar 가져오기` 버튼은 API 설정이 없을 때 설정 안내 메시지를 표시하고 앱 오류를 내지 않음.
+  - Streamlit default header/toolbar is hidden and `Deploy` is not visible.
+  - Main workspace starts at the top of the page.
+  - Top day/week/month selector was removed.
+  - Left panel `월 보기` link switches to month calendar and becomes active.
+  - Bottom `캘린더 작업` area contains previous/today/next, base date, Google Calendar import, and search.
 
 ## Visible Sections
 
-- Top bar with `AI Scheduler`, search, date, notification, and profile.
-- Functional control bar with previous/today/next, day/week/month selector, base date picker, and Google Calendar import.
-- Left PC workspace panel with active Week/Day/Month indicator, integrations, and mini calendar.
+- Left PC workspace panel with `AI Scheduler`, day/week/month navigation links, integrations, and mini calendar.
 - Center calendar workspace with day, week, and month layouts.
 - Right AI work panel with `AI Smart Assistant`, smart task recommendations, and productivity score.
-- Bottom interaction area with AI schedule input, manual registration, and event update/delete controls.
+- Bottom task area with calendar controls, AI schedule input, manual registration, search, and event update/delete controls.
 - Local SQLite DB: `data/personal_assistant_pc.db`
 
 ## Google Calendar Setup

@@ -18,6 +18,7 @@ st.set_page_config(page_title="AI Scheduler", page_icon=":calendar:", layout="wi
 
 
 VIEW_LABELS = {"day": "일", "week": "주", "month": "월"}
+VIEW_TITLES = {"day": "일 보기", "week": "주 보기", "month": "월 보기"}
 WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
 
 
@@ -36,6 +37,10 @@ def init_state() -> None:
     st.session_state.setdefault("selected_date", today)
     st.session_state.setdefault("view_mode", "week")
     st.session_state.setdefault("sync_message", "")
+    st.session_state.setdefault("search_query", "")
+    query_view = st.query_params.get("view")
+    if query_view in VIEW_LABELS:
+        st.session_state.view_mode = query_view
 
 
 def inject_styles() -> None:
@@ -66,9 +71,14 @@ def inject_styles() -> None:
             color: var(--text) !important;
             font-family: var(--font-kr) !important;
         }
-        [data-testid="stHeader"] {
-            background: rgba(248, 249, 255, .95) !important;
-            border-bottom: 1px solid var(--outline);
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"],
+        [data-testid="stDecoration"],
+        [data-testid="stStatusWidget"],
+        #MainMenu,
+        footer {
+            display: none !important;
+            visibility: hidden !important;
         }
         .block-container {
             padding: 0 !important;
@@ -153,11 +163,6 @@ def inject_styles() -> None:
             color: var(--primary);
             font-weight: 850;
         }
-        .control-shell {
-            padding: 14px 24px 16px;
-            background: var(--surface);
-            border-bottom: 1px solid var(--outline-soft);
-        }
         .workspace {
             display: grid;
             grid-template-columns: 250px minmax(460px, 1fr) 320px;
@@ -214,8 +219,17 @@ def inject_styles() -> None:
             color: var(--muted);
             font-weight: 750;
             margin-bottom: 6px;
+            text-decoration: none !important;
         }
         .nav-item.active {
+            background: var(--primary-strong);
+            color: #fff;
+        }
+        .nav-item:hover {
+            background: rgba(37,99,235,.12);
+            color: var(--primary);
+        }
+        .nav-item.active:hover {
             background: var(--primary-strong);
             color: #fff;
         }
@@ -556,8 +570,16 @@ def inject_styles() -> None:
             font-size: .86rem;
         }
         .streamlit-forms {
-            padding: 0 24px 24px;
+            padding: 24px;
             background: var(--surface);
+            border-top: 1px solid var(--outline);
+        }
+        .bottom-tool-shell {
+            margin-bottom: 16px;
+            padding: 18px;
+            border: 1px solid var(--outline);
+            border-radius: .75rem;
+            background: var(--surface-low);
         }
         @media (max-width: 900px) {
             .workspace {
@@ -811,39 +833,9 @@ def import_google_events() -> None:
         st.session_state.sync_message = result.message
 
 
-def render_control_bar() -> None:
-    st.html("<div class='control-shell'>")
-    nav_col, view_col, date_col, sync_col = st.columns([1.2, 1.15, 1.1, 1.35], gap="medium")
-    with nav_col:
-        prev_col, today_col, next_col = st.columns(3)
-        if prev_col.button("이전", use_container_width=True):
-            shift_selected_date(-1)
-        if today_col.button("오늘", use_container_width=True):
-            st.session_state.selected_date = date.today()
-        if next_col.button("다음", use_container_width=True):
-            shift_selected_date(1)
-    with view_col:
-        st.radio(
-            "캘린더 보기",
-            options=["day", "week", "month"],
-            format_func=lambda value: VIEW_LABELS[value],
-            horizontal=True,
-            key="view_mode",
-        )
-    with date_col:
-        picked = st.date_input("기준 날짜", value=st.session_state.selected_date)
-        if picked != st.session_state.selected_date:
-            st.session_state.selected_date = picked
-    with sync_col:
-        if st.button("Google Calendar 가져오기", type="primary", use_container_width=True):
-            import_google_events()
-            st.rerun()
-        if st.session_state.sync_message:
-            if "실패" in st.session_state.sync_message or "설정" in st.session_state.sync_message:
-                st.warning(st.session_state.sync_message)
-            else:
-                st.success(st.session_state.sync_message)
-    st.html("</div>")
+def nav_link(view_mode: str, current_view: str) -> str:
+    active = " active" if view_mode == current_view else ""
+    return f'<a class="nav-item{active}" href="?view={view_mode}">{VIEW_TITLES[view_mode]}</a>'
 
 
 def render_static_workspace(
@@ -864,28 +856,18 @@ def render_static_workspace(
     second_task = recommendations[1].event.title if len(recommendations) > 1 else "Google Calendar 가져오기를 실행해 보세요"
     google_status_class = "" if calendar_client.enabled else " off"
     html = f"""
-    <div class="top-shell">
-        <div class="brand">
-            <span class="brand-menu">Menu</span>
-            <h1 class="brand-title">AI Scheduler</h1>
-        </div>
-        <div class="search-pill">일정, 참석자, 프로젝트 검색</div>
-        <div class="search-pill">{selected:%Y-%m-%d}</div>
-        <div style="text-align:center;color:var(--muted);font-size:1rem;">Bell</div>
-        <div class="profile-chip">ME</div>
-    </div>
     <main class="workspace scheduler-workspace">
         <aside class="left-pane">
             <div class="identity">
                 <div class="identity-icon">AI</div>
                 <div>
-                    <p class="identity-title">개인 일정 관리</p>
-                    <p class="identity-subtitle">PC Workspace</p>
+                    <p class="identity-title">AI Scheduler</p>
+                    <p class="identity-subtitle">개인 일정 관리 · PC Workspace</p>
                 </div>
             </div>
-            <div class="nav-item {'active' if view_mode == 'week' else ''}">Week View</div>
-            <div class="nav-item {'active' if view_mode == 'day' else ''}">Day View</div>
-            <div class="nav-item {'active' if view_mode == 'month' else ''}">Month View</div>
+            {nav_link("week", view_mode)}
+            {nav_link("day", view_mode)}
+            {nav_link("month", view_mode)}
             <p class="section-label">Integrations</p>
             <div class="integration-row"><div class="integration-left"><div class="integration-icon">G</div><span>Google Calendar</span></div><span class="status-dot{google_status_class}"></span></div>
             <div class="integration-row"><div class="integration-left"><div class="integration-icon">AI</div><span>OpenAI / Gemini</span></div><span class="status-dot{' ' if settings.llm_enabled else ' off'}"></span></div>
@@ -958,6 +940,51 @@ def create_manual_event(title: str, start_date: date, start_time: time, duration
 
 def render_interaction_panel(events: list[ScheduleEvent]) -> None:
     st.markdown("<div class='streamlit-forms'>", unsafe_allow_html=True)
+    st.markdown("#### 캘린더 작업")
+    tool_nav_col, tool_date_col, tool_sync_col, tool_search_col = st.columns([1.15, 1, 1.15, 1.6], gap="medium")
+    with tool_nav_col:
+        prev_col, today_col, next_col = st.columns(3)
+        if prev_col.button("이전", use_container_width=True):
+            shift_selected_date(-1)
+            st.rerun()
+        if today_col.button("오늘", use_container_width=True):
+            st.session_state.selected_date = date.today()
+            st.rerun()
+        if next_col.button("다음", use_container_width=True):
+            shift_selected_date(1)
+            st.rerun()
+    with tool_date_col:
+        picked = st.date_input("기준 날짜", value=st.session_state.selected_date, key="bottom_selected_date")
+        if picked != st.session_state.selected_date:
+            st.session_state.selected_date = picked
+            st.rerun()
+    with tool_sync_col:
+        if st.button("Google Calendar 가져오기", type="primary", use_container_width=True):
+            import_google_events()
+            st.rerun()
+    with tool_search_col:
+        st.session_state.search_query = st.text_input(
+            "일정 검색",
+            value=st.session_state.search_query,
+            placeholder="제목, 설명, 장소 검색",
+        )
+
+    if st.session_state.sync_message:
+        if "실패" in st.session_state.sync_message or "설정" in st.session_state.sync_message:
+            st.warning(st.session_state.sync_message)
+        else:
+            st.success(st.session_state.sync_message)
+
+    query = st.session_state.search_query.strip().lower()
+    filtered_events = [
+        event
+        for event in events
+        if not query
+        or query in event.title.lower()
+        or query in event.description.lower()
+        or query in event.location.lower()
+    ]
+
     input_col, manual_col, list_col = st.columns([1.05, 1, 1.45], gap="large")
     with input_col:
         st.markdown("#### AI 일정 입력")
@@ -987,9 +1014,9 @@ def render_interaction_panel(events: list[ScheduleEvent]) -> None:
                 st.rerun()
     with list_col:
         st.markdown("#### 일정 조회 및 변경")
-        if not events:
+        if not filtered_events:
             st.markdown("<div class='empty-note'>등록된 일정이 없습니다.</div>", unsafe_allow_html=True)
-        for event in events:
+        for event in filtered_events:
             with st.expander(f"{event.date_label} {event.time_label} · {event.title}", expanded=False):
                 with st.form(f"update_{event.id}"):
                     updated_title = st.text_input("제목", value=event.title, key=f"title_{event.id}")
@@ -1022,7 +1049,6 @@ def main() -> None:
     inject_styles()
     all_events = store.list_events(include_past=True)
     alerts = store.upcoming_important()
-    render_control_bar()
     render_static_workspace(all_events, alerts, st.session_state.selected_date, st.session_state.view_mode)
     render_interaction_panel(all_events)
     st.caption(
