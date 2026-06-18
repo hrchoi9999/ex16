@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Hanken+Grotesk:wght@600;700&family=JetBrains+Mono:wght@500&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@100..900&family=Inter:wght@100..900&family=JetBrains+Mono:wght@100..900&display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid #e2e8f0;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed": "#dae2fd",
+                        "on-surface": "#0b1c30",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-surface": "#213145",
+                        "surface-dim": "#cbdbf5",
+                        "secondary": "#712ae2",
+                        "on-secondary-container": "#fffbff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#25005a",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-tertiary-fixed": "#131b2e",
+                        "surface-container": "#e5eeff",
+                        "on-tertiary-container": "#eef0ff",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-tertiary-fixed-variant": "#3f465c",
+                        "tertiary-container": "#656d84",
+                        "on-primary-container": "#eeefff",
+                        "primary-container": "#2563eb",
+                        "primary": "#004ac6",
+                        "surface-container-low": "#eff4ff",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline-variant": "#c3c6d7",
+                        "surface": "#f8f9ff",
+                        "on-error": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface-tint": "#0053db",
+                        "on-surface-variant": "#434655",
+                        "surface-variant": "#d3e4fe",
+                        "primary-fixed": "#dbe1ff",
+                        "secondary-fixed": "#eaddff",
+                        "on-background": "#0b1c30",
+                        "inverse-primary": "#b4c5ff",
+                        "tertiary": "#4d556b",
+                        "surface-container-high": "#dce9ff",
+                        "outline": "#737686",
+                        "surface-bright": "#f8f9ff",
+                        "on-secondary-fixed-variant": "#5a00c6",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#d2bbff",
+                        "secondary-container": "#8a4cfc",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#bec6e0",
+                        "error": "#ba1a1a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-desktop": "64px",
+                        "xl": "40px",
+                        "xs": "4px",
+                        "gutter": "24px",
+                        "md": "16px",
+                        "sm": "8px",
+                        "margin-mobile": "16px",
+                        "lg": "24px",
+                        "base": "4px",
+                        "max-width": "1440px"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "label-md": ["JetBrains Mono"],
+                        "label-sm": ["JetBrains Mono"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-hidden h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface border-b border-outline-variant dark:border-outline-variant flex justify-between items-center px-gutter h-14 w-full">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-primary cursor-pointer active:scale-95 transition-colors hover:bg-surface-container-highest p-2 rounded-full" data-icon="menu">menu</span>
+<h1 class="font-headline-lg text-headline-lg font-bold text-primary dark:text-primary">AI Calendar</h1>
+</div>
+<div class="flex items-center gap-sm">
+<div class="flex items-center bg-surface-container px-3 py-1 rounded-full text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px] mr-2" data-icon="search">search</span>
+<span class="font-label-md text-label-md">Search...</span>
+</div>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline">
+<img class="w-full h-full object-cover" data-alt="A professional corporate headshot of a person with a friendly expression, set against a clean, minimalist office background with soft daylight. The image has high clarity, professional lighting, and a modern business aesthetic using cool tones and soft whites." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvS4kpQiU0YwpqARI8paBR5dqj0NMlNEbpeFkaJWfHAuKKuWEyddwEM4rLjPukb8SFPWLga0o76vIRSkmL8FL9bUGAg_A9SCcUON4uqZHkZWHuuESOMoHrtsW6M8VJzs4v2aqp8DgInkBSHL72XVNit9ZWaCko4TIYzIFy3dVTs_NCLNWXExQB9g35KAT1Z1zxe1N-IT_NA2uV2zg1Ro7_vwlV17CTR0fh40n2t0JM2q-P8WgCjforyerklbem2YaTXfaCEdHBUG8"/>
+</div>
+</div>
+</header>
+<main class="flex-1 mt-14 flex overflow-hidden">
+<!-- NavigationDrawer (Sidebar) -->
+<aside class="hidden md:flex flex-col pt-4 gap-base-unit bg-surface-container-low border-r border-outline-variant w-64 shrink-0 overflow-y-auto">
+<div class="px-gutter mb-6">
+<p class="font-label-sm text-label-sm text-outline uppercase tracking-widest">Navigation</p>
+</div>
+<nav class="flex flex-col gap-1 px-2">
+<div class="flex items-center gap-md px-4 py-3 cursor-pointer text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="view_day">view_day</span>
+<span class="font-body-md text-body-md">Day View</span>
+</div>
+<div class="flex items-center gap-md px-4 py-3 cursor-pointer text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="view_week">view_week</span>
+<span class="font-body-md text-body-md">Week View</span>
+</div>
+<div class="flex items-center gap-md px-4 py-3 cursor-pointer text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="view_month">view_comfy</span>
+<span class="font-body-md text-body-md">Month View</span>
+</div>
+<div class="mt-8 px-4 flex flex-col gap-4">
+<div class="p-4 bg-primary/5 rounded-xl border border-primary/10">
+<p class="font-label-sm text-label-sm text-primary mb-1">PRO FEATURES</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Syncing with Google Workspace...</p>
+<div class="w-full bg-surface-container h-1 mt-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[85%]"></div>
+</div>
+</div>
+</div>
+</nav>
+</aside>
+<!-- Content Canvas -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Main Schedule Column -->
+<section class="flex-1 p-lg overflow-y-auto bg-white border-r border-outline-variant">
+<div class="max-w-3xl mx-auto">
+<div class="flex justify-between items-center mb-lg">
+<h2 class="font-headline-md text-headline-md">Tuesday, June 12</h2>
+<div class="flex gap-sm">
+<button class="bg-surface-container-highest px-4 py-2 rounded-full font-label-md text-label-md hover:bg-outline-variant transition-colors">Today</button>
+<button class="bg-primary text-white px-4 py-2 rounded-full font-label-md text-label-md flex items-center gap-sm">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                                Create
+                            </button>
+</div>
+</div>
+<!-- Time Grid -->
+<div class="space-y-gutter relative">
+<!-- Hour markers & events -->
+<div class="flex gap-gutter group">
+<div class="w-16 text-right font-label-sm text-label-sm text-outline py-2">09:00</div>
+<div class="flex-1 min-h-[80px] border-t border-outline-variant pt-2">
+<div class="bg-primary-fixed p-3 rounded-lg border-l-4 border-primary shadow-sm">
+<p class="font-label-md text-label-md text-on-primary-fixed">Team Standup</p>
+<p class="font-body-sm text-body-sm text-on-primary-fixed-variant">Conference Room B • 09:00 - 09:30</p>
+</div>
+</div>
+</div>
+<div class="flex gap-gutter">
+<div class="w-16 text-right font-label-sm text-label-sm text-outline py-2">10:00</div>
+<div class="flex-1 min-h-[80px] border-t border-outline-variant pt-2">
+<div class="bg-surface-container p-3 rounded-lg border-l-4 border-outline text-on-surface-variant">
+<p class="font-label-md text-label-md">Deep Work Session</p>
+<p class="font-body-sm text-body-sm">Focus Mode • 10:00 - 12:00</p>
+</div>
+</div>
+</div>
+<div class="flex gap-gutter relative">
+<div class="w-16 text-right font-label-sm text-label-sm text-outline py-2">11:00</div>
+<div class="flex-1 min-h-[80px] border-t border-outline-variant">
+<!-- Potential Conflict Indicator -->
+<div class="absolute inset-x-20 top-4 bottom-4 bg-error-container/20 border-2 border-dashed border-error rounded-xl flex flex-col items-center justify-center p-4 z-10 backdrop-blur-[1px]">
+<span class="material-symbols-outlined text-error mb-1" data-icon="warning">warning</span>
+<p class="font-label-md text-label-md text-error">Schedule Conflict Detected</p>
+<p class="font-body-sm text-body-sm text-on-error-container text-center">Product Review (11:15) overlaps with Deep Work</p>
+</div>
+</div>
+</div>
+<div class="flex gap-gutter">
+<div class="w-16 text-right font-label-sm text-label-sm text-outline py-2">12:00</div>
+<div class="flex-1 min-h-[80px] border-t border-outline-variant pt-2">
+<p class="font-body-sm text-body-sm text-outline italic">Available for Lunch</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- AI Assistant Interaction Panel (The Request) -->
+<aside class="w-[420px] bg-surface-container-low flex flex-col h-full shadow-lg z-20">
+<!-- Header -->
+<div class="p-lg border-b border-outline-variant flex justify-between items-center bg-white">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 bg-secondary-container rounded-full flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div>
+<h3 class="font-headline-md text-[18px] leading-tight">AI Assistant</h3>
+<p class="font-body-sm text-body-sm text-secondary font-medium">Resolving Conflict...</p>
+</div>
+</div>
+<button class="text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<!-- Chat History -->
+<div class="flex-1 overflow-y-auto p-gutter space-y-lg">
+<!-- Message Group 1 -->
+<div class="flex flex-col gap-sm">
+<div class="bg-surface-container-highest self-end px-4 py-3 rounded-2xl rounded-tr-none max-w-[85%]">
+<p class="font-body-md text-body-md">My schedule looks messy today. Can you fix the 11:00 conflict?</p>
+</div>
+<p class="font-label-sm text-label-sm text-outline self-end mr-2">10:42 AM</p>
+</div>
+<!-- Assistant Response -->
+<div class="flex flex-col gap-sm">
+<div class="flex items-start gap-sm">
+<div class="w-6 h-6 bg-secondary text-white rounded-full flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[14px]" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div class="bg-white border border-outline-variant px-4 py-3 rounded-2xl rounded-tl-none shadow-sm max-w-[90%]">
+<p class="font-body-md text-body-md">I see a conflict between your **Deep Work** and the **Product Review**. The Product Review involves 4 stakeholders. Here are my best suggestions for resolution:</p>
+</div>
+</div>
+</div>
+<!-- Smart Suggestions Bento -->
+<div class="grid grid-cols-1 gap-md ml-8">
+<!-- Option 1 -->
+<div class="bg-white p-4 rounded-xl border border-primary-container/30 hover:border-primary transition-all cursor-pointer group shadow-sm">
+<div class="flex justify-between items-start mb-2">
+<span class="bg-primary/10 text-primary px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Recommended</span>
+<span class="material-symbols-outlined text-primary opacity-0 group-hover:opacity-100 transition-opacity" data-icon="check_circle">check_circle</span>
+</div>
+<p class="font-label-md text-label-md mb-1">Reschedule Deep Work</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Move session to 1:30 PM after lunch. All participants are available for the review at 11:00.</p>
+</div>
+<!-- Option 2 -->
+<div class="bg-white p-4 rounded-xl border border-outline-variant hover:border-secondary transition-all cursor-pointer group shadow-sm">
+<div class="flex justify-between items-start mb-2">
+<span class="bg-secondary/10 text-secondary px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Efficient</span>
+</div>
+<p class="font-label-md text-label-md mb-1">Push Product Review</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Move review to 4:00 PM. Note: Marketing Lead has a tentative conflict.</p>
+</div>
+</div>
+<!-- System Log / Conflict Details -->
+<div class="ml-8 border-l-2 border-error/30 pl-4 py-2">
+<p class="font-label-sm text-label-sm text-error mb-2 flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]" data-icon="report_problem">report_problem</span>
+                            Stakeholder Overlap Analysis
+                        </p>
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full border-2 border-white bg-surface-container-highest flex items-center justify-center font-label-sm">JD</div>
+<div class="w-8 h-8 rounded-full border-2 border-white bg-surface-container-highest flex items-center justify-center font-label-sm">AS</div>
+<div class="w-8 h-8 rounded-full border-2 border-white bg-surface-container-highest flex items-center justify-center font-label-sm">MK</div>
+</div>
+<p class="mt-2 font-body-sm text-body-sm text-outline">Moving the review would delay project sign-off by 24 hours.</p>
+</div>
+</div>
+<!-- Input Area -->
+<div class="p-gutter bg-white border-t border-outline-variant space-y-md">
+<div class="flex gap-sm overflow-x-auto pb-2 scrollbar-hide">
+<button class="whitespace-nowrap px-4 py-2 bg-surface-container rounded-full text-label-sm font-label-sm hover:bg-surface-container-highest transition-colors">"Apply Option 1"</button>
+<button class="whitespace-nowrap px-4 py-2 bg-surface-container rounded-full text-label-sm font-label-sm hover:bg-surface-container-highest transition-colors">"Tell everyone I'm busy"</button>
+<button class="whitespace-nowrap px-4 py-2 bg-surface-container rounded-full text-label-sm font-label-sm hover:bg-surface-container-highest transition-colors">"Find another time"</button>
+</div>
+<div class="relative">
+<textarea class="w-full bg-surface-container-low border border-outline-variant rounded-2xl px-4 py-3 pr-12 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none font-body-md" placeholder="Type a command or ask a question..." rows="2"></textarea>
+<button class="absolute right-3 bottom-3 w-8 h-8 bg-primary text-white rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[20px]" data-icon="send">send</span>
+</button>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 bg-surface-container dark:bg-surface-container border-t border-outline-variant flex justify-around items-center h-16 px-2 pb-safe">
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="calendar_today">calendar_today</span>
+<span class="font-label-md text-label-md">Calendar</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="task_alt">task_alt</span>
+<span class="font-label-md text-label-md">Tasks</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 active:scale-90 transition-transform cursor-pointer">
+<span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+<span class="font-label-md text-label-md">AI Assistant</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</div>
+</nav>
+<!-- Micro-interaction Scripts -->
+<script>
+        // Simple hover effect for calendar grid
+        const gridCells = document.querySelectorAll('.flex-1.min-h-\\[80px\\]');
+        gridCells.forEach(cell => {
+            cell.addEventListener('mouseenter', () => {
+                if(!cell.children.length) {
+                    cell.style.backgroundColor = 'rgba(0, 74, 198, 0.02)';
+                }
+            });
+            cell.addEventListener('mouseleave', () => {
+                cell.style.backgroundColor = 'transparent';
+            });
+        });
+
+        // Toggle Assistant Panel (Visual only)
+        function toggleAssistant() {
+            const panel = document.querySelector('aside.w-\\[420px\\]');
+            panel.classList.toggle('hidden');
+        }
+    </script>
+</body></html>
