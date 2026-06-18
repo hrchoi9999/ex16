@@ -32,6 +32,8 @@ def initialize_state() -> None:
     st.session_state.setdefault("selected_date", today)
     st.session_state.setdefault("calendar_anchor", today.replace(day=1))
     st.session_state.setdefault("view_mode", "주")
+    st.session_state.setdefault("menu_collapsed", False)
+    st.session_state.setdefault("global_search", "")
 
 
 def inject_styles() -> None:
@@ -39,31 +41,49 @@ def inject_styles() -> None:
         """
         <style>
         :root {
-            --navy: #0f172a;
+            --navy: #0F172A;
             --slate: #334155;
             --muted: #64748b;
             --line: #e2e8f0;
-            --surface: #f8f9fa;
-            --card: #ffffff;
-            --green: #2f855a;
-            --amber: #b7791f;
-            --red: #c2410c;
+            --surface: #F8F9FA;
+            --card: #FFFFFF;
+            --green: #2F855A;
+            --amber: #B7791F;
+            --red: #C2410C;
+            --font-sans: Pretendard, Inter, Roboto, "Noto Sans KR", Arial, sans-serif;
+        }
+        html, body, .stApp, [data-testid="stAppViewContainer"] {
+            background: var(--card) !important;
+            color: var(--navy) !important;
+            font-family: var(--font-sans) !important;
+        }
+        [data-testid="stHeader"] {
+            background: rgba(255, 255, 255, .92) !important;
+            border-bottom: 1px solid var(--line);
+        }
+        * {
+            letter-spacing: 0 !important;
         }
         .block-container {
-            padding: 1rem 1.25rem 1.5rem;
+            padding: .75rem 1rem 1.1rem;
             max-width: 100%;
         }
-        h1, h2, h3 {
+        h1, h2, h3, h4, p, label, span {
             color: var(--navy);
-            letter-spacing: 0;
+            font-family: var(--font-sans) !important;
+        }
+        h4 {
+            font-size: .98rem !important;
+            margin: .35rem 0 .55rem !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"] {
-            border-color: var(--line);
-            border-radius: 8px;
+            border-color: var(--line) !important;
+            border-radius: 8px !important;
             background: var(--card);
         }
-        section[data-testid="stSidebar"] {
-            background: var(--surface);
+        [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
+            background: var(--surface) !important;
+            color: var(--navy) !important;
         }
         .app-title {
             display: flex;
@@ -75,30 +95,53 @@ def inject_styles() -> None:
             margin-bottom: .85rem;
         }
         .app-title h1 {
-            font-size: 1.45rem;
+            color: var(--navy) !important;
+            font-size: 1.35rem;
+            line-height: 1.15;
             margin: 0;
+        }
+        .top-header {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) 180px 44px 44px;
+            gap: .6rem;
+            align-items: center;
+            margin-bottom: .75rem;
+        }
+        .icon-button, .profile-dot {
+            width: 38px;
+            height: 38px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface);
+            color: var(--navy);
+            font-size: .85rem;
+            font-weight: 800;
         }
         .workspace-label {
             color: var(--muted);
-            font-size: .82rem;
+            font-size: .76rem;
             margin: 0;
         }
         .panel-title {
-            font-size: .95rem;
+            font-size: .82rem;
             font-weight: 700;
             color: var(--navy);
-            margin: .15rem 0 .55rem;
+            margin: .05rem 0 .38rem;
+            text-transform: uppercase;
         }
         .nav-item {
             display: flex;
             align-items: center;
             gap: .5rem;
-            padding: .5rem .55rem;
+            padding: .4rem .46rem;
             border-radius: 7px;
             color: var(--slate);
-            font-size: .9rem;
+            font-size: .82rem;
             border: 1px solid transparent;
-            margin-bottom: .2rem;
+            margin-bottom: .12rem;
         }
         .nav-item.active {
             color: var(--navy);
@@ -109,19 +152,19 @@ def inject_styles() -> None:
         .summary-card {
             border: 1px solid var(--line);
             border-radius: 8px;
-            padding: .7rem .75rem;
+            padding: .55rem .6rem;
             background: #fff;
-            margin-bottom: .55rem;
+            margin-bottom: .42rem;
         }
         .summary-value {
-            font-size: 1.15rem;
+            font-size: 1rem;
             font-weight: 800;
             color: var(--navy);
             margin: 0;
         }
         .summary-label {
             color: var(--muted);
-            font-size: .78rem;
+            font-size: .72rem;
             margin: 0;
         }
         .event-card {
@@ -141,11 +184,12 @@ def inject_styles() -> None:
         .event-title {
             font-weight: 800;
             color: var(--navy);
+            font-size: .86rem;
             margin: 0 0 .2rem;
         }
         .event-meta {
             color: var(--muted);
-            font-size: .82rem;
+            font-size: .76rem;
             margin: 0;
         }
         .tag {
@@ -167,12 +211,48 @@ def inject_styles() -> None:
             color: var(--amber);
         }
         .calendar-cell {
-            min-height: 5.7rem;
+            min-height: 5.45rem;
             border: 1px solid var(--line);
             border-radius: 8px;
             padding: .45rem;
             background: #fff;
             margin-bottom: .5rem;
+        }
+        .mini-month {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: .08rem;
+            margin-top: .35rem;
+        }
+        .mini-month-label {
+            color: var(--muted) !important;
+            font-size: .64rem;
+            text-align: center;
+            margin: 0 0 .12rem;
+        }
+        .mini-day {
+            position: relative;
+            min-height: 1.42rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            color: var(--slate);
+            font-size: .7rem;
+            line-height: 1;
+        }
+        .mini-day.today-dot {
+            background: var(--navy);
+            color: #fff;
+            font-weight: 800;
+        }
+        .day-dot {
+            position: absolute;
+            width: .25rem;
+            height: .25rem;
+            border-radius: 999px;
+            background: var(--amber);
+            bottom: .1rem;
         }
         .calendar-cell.today {
             border-color: var(--navy);
@@ -212,6 +292,12 @@ def inject_styles() -> None:
         }
         .stButton > button {
             border-radius: 7px;
+        }
+        .stTextInput input, .stTextArea textarea {
+            font-family: var(--font-sans) !important;
+        }
+        .stProgress > div > div > div {
+            background-color: var(--green) !important;
         }
         </style>
         """,
@@ -261,13 +347,49 @@ def add_months(day: date, months: int) -> date:
     return date(year, month, 1)
 
 
+def mini_month_html(events: list[ScheduleEvent], anchor: date) -> str:
+    event_days = {event.start_at.date() for event in events}
+    today = date.today()
+    rows: list[str] = []
+    rows.append("<div class='mini-month'>")
+    for label in ["일", "월", "화", "수", "목", "금", "토"]:
+        rows.append(f"<p class='mini-month-label'>{label}</p>")
+    for week in calendar.Calendar(firstweekday=6).monthdatescalendar(anchor.year, anchor.month):
+        for current_day in week:
+            is_muted = current_day.month != anchor.month
+            is_today = current_day == today
+            has_event = current_day in event_days
+            style = "opacity:.34;" if is_muted else ""
+            marker = "<span class='day-dot'></span>" if has_event else ""
+            today_class = " today-dot" if is_today else ""
+            rows.append(
+                f"<div class='mini-day{today_class}' style='{style}'>{current_day.day}{marker}</div>"
+            )
+    rows.append("</div>")
+    return "".join(rows)
+
+
 def render_left_panel(events: list[ScheduleEvent], alerts: list[ScheduleEvent]) -> None:
     st.markdown("<p class='panel-title'>워크스페이스</p>", unsafe_allow_html=True)
-    st.markdown("<div class='nav-item active'>📊 Dashboard</div>", unsafe_allow_html=True)
-    st.markdown("<div class='nav-item'>📅 Calendar</div>", unsafe_allow_html=True)
-    st.markdown("<div class='nav-item'>🗂 Projects</div>", unsafe_allow_html=True)
-    st.markdown("<div class='nav-item'>📈 Analytics</div>", unsafe_allow_html=True)
-    st.markdown("<div class='nav-item'>⚙ Settings</div>", unsafe_allow_html=True)
+    if st.button(
+        "메뉴 펼치기" if st.session_state.menu_collapsed else "메뉴 접기",
+        use_container_width=True,
+        key="toggle_menu",
+    ):
+        st.session_state.menu_collapsed = not st.session_state.menu_collapsed
+        st.rerun()
+    if st.session_state.menu_collapsed:
+        st.markdown("<div class='nav-item active'>D</div>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-item'>C</div>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-item'>P</div>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-item'>A</div>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-item'>S</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div class='nav-item active'>Dashboard</div>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-item'>Calendar</div>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-item'>Projects</div>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-item'>Analytics</div>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-item'>Settings</div>", unsafe_allow_html=True)
 
     st.divider()
     st.markdown("<p class='panel-title'>월간 캘린더</p>", unsafe_allow_html=True)
@@ -283,31 +405,7 @@ def render_left_panel(events: list[ScheduleEvent], alerts: list[ScheduleEvent]) 
         st.session_state.calendar_anchor = add_months(st.session_state.calendar_anchor, 1)
         st.rerun()
 
-    weekdays = ["일", "월", "화", "수", "목", "금", "토"]
-    header_cols = st.columns(7)
-    for col, label in zip(header_cols, weekdays):
-        col.markdown(f"<p style='text-align:center;color:#64748b;font-size:.78rem'>{label}</p>", unsafe_allow_html=True)
-
-    month_calendar = calendar.Calendar(firstweekday=6).monthdatescalendar(
-        st.session_state.calendar_anchor.year,
-        st.session_state.calendar_anchor.month,
-    )
-    for week_index, week in enumerate(month_calendar):
-        day_cols = st.columns(7)
-        for day_col, current_day in zip(day_cols, week):
-            day_events = events_for_day(events, current_day)
-            is_current_month = current_day.month == st.session_state.calendar_anchor.month
-            label = str(current_day.day)
-            if day_events:
-                label += f" · {len(day_events)}"
-            if day_col.button(
-                label,
-                key=f"mini_day_{week_index}_{current_day.isoformat()}",
-                use_container_width=True,
-                disabled=not is_current_month,
-            ):
-                st.session_state.selected_date = current_day
-                st.rerun()
+    st.markdown(mini_month_html(events, st.session_state.calendar_anchor), unsafe_allow_html=True)
 
     st.divider()
     st.markdown("<p class='panel-title'>오늘 요약</p>", unsafe_allow_html=True)
@@ -473,6 +571,16 @@ def render_right_panel(events: list[ScheduleEvent], alerts: list[ScheduleEvent])
             st.markdown(event_card(event), unsafe_allow_html=True)
 
     st.divider()
+    st.markdown("#### 주간 완료율")
+    current_week_start = week_start(st.session_state.selected_date)
+    current_week_end = current_week_start + timedelta(days=6)
+    weekly_events = events_for_range(events, current_week_start, current_week_end)
+    completed_events = [event for event in weekly_events if event.end_at < datetime.now()]
+    completion_ratio = len(completed_events) / len(weekly_events) if weekly_events else 0
+    st.progress(completion_ratio)
+    st.caption(f"{len(completed_events)} / {len(weekly_events)} 일정 완료 기준")
+
+    st.divider()
     st.markdown("#### AI 일정 입력")
     user_command = st.text_area(
         "AI 명령",
@@ -542,7 +650,8 @@ def render_right_panel(events: list[ScheduleEvent], alerts: list[ScheduleEvent])
 
     st.divider()
     st.markdown("#### 우선순위 추천")
-    recommendations = recommend_priorities(events)
+    upcoming_events = [event for event in events if event.end_at >= datetime.now()]
+    recommendations = recommend_priorities(upcoming_events)
     if not recommendations:
         st.markdown("<div class='empty-note'>추천할 일정이 없습니다.</div>", unsafe_allow_html=True)
     for item in recommendations[:4]:
@@ -552,7 +661,7 @@ def render_right_panel(events: list[ScheduleEvent], alerts: list[ScheduleEvent])
 initialize_state()
 inject_styles()
 
-events = store.list_events()
+events = store.list_events(include_past=True)
 alerts = store.upcoming_important()
 
 st.markdown(
@@ -568,7 +677,32 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-left, center, right = st.columns([1.05, 2.35, 1.25], gap="medium")
+header_search, header_date, header_notice, header_profile = st.columns([1.5, .55, .24, .2], gap="small")
+with header_search:
+    st.text_input("글로벌 검색", placeholder="전체 일정 검색", label_visibility="collapsed", key="global_search")
+with header_date:
+    header_day = st.date_input("날짜 선택", value=st.session_state.selected_date, label_visibility="collapsed")
+    if header_day != st.session_state.selected_date:
+        st.session_state.selected_date = header_day
+        st.session_state.calendar_anchor = header_day.replace(day=1)
+        st.rerun()
+with header_notice:
+    st.button(f"알림 {len(alerts)}", use_container_width=True)
+with header_profile:
+    st.markdown("<div class='profile-dot'>HC</div>", unsafe_allow_html=True)
+
+if st.session_state.global_search.strip():
+    query = st.session_state.global_search.strip().lower()
+    global_matches = [
+        event
+        for event in events
+        if query in event.title.lower()
+        or query in event.description.lower()
+        or query in event.location.lower()
+    ]
+    st.caption(f"글로벌 검색 결과 {len(global_matches)}개")
+
+left, center, right = st.columns([.82, 2.8, 1.0], gap="medium")
 
 with left:
     with st.container(border=True):
