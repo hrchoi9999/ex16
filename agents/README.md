@@ -12,3 +12,11 @@
 - `notification_agent`: 중요한 일정 알림과 임박 일정 탐지 담당
 - `priority_agent`: 우선순위 추천 규칙과 점수화 담당
 - `qa_agent`: 테스트, 실행 검증, 회귀 확인 담당
+
+## 1차 병렬 작업 흐름
+
+1. 모든 Agent는 먼저 `planner_agent/SERVICE_PLAN.md`를 읽는다.
+2. 다음으로 `PHASE1_PARALLEL_WORK.md`에서 전체 병렬 작업 흐름을 확인한다.
+3. 각 Agent는 자기 폴더의 `GUIDELINES.md`와 `PHASE1_TASKS.md`를 기준으로 작업한다.
+4. `design_agent`는 추가로 `DESIGN_SPEC.md`의 디자인 프롬프트와 토큰을 반드시 따른다.
+5. 작업이 끝나면 `qa_agent` 기준에 따라 검증하고, `lead_dev_agent`가 커밋/푸시 흐름을 확인한다.

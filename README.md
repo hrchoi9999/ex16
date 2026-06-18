@@ -44,7 +44,12 @@ cd C:\AI_Agent\ex16
 - `agents/`: 역할별 Agent 작업 원칙과 가이드
 - `tests/`: 핵심 파서와 저장소 테스트
 
+## Agent 기획 문서
+
+- 총괄 서비스 기획서: `agents/planner_agent/SERVICE_PLAN.md`
+- 1차 병렬 작업 지시서: `agents/PHASE1_PARALLEL_WORK.md`
+- 디자인 스펙: `agents/design_agent/DESIGN_SPEC.md`
+
 ## API 연동 메모
 
 현재 앱은 API 키 없이도 SQLite로 동작한다. Google Calendar 동기화는 `GOOGLE_SERVICE_ACCOUNT_FILE`과 `GOOGLE_CALENDAR_ID`가 설정되면 활성화된다. Gemini/OpenAI 자연어 파싱은 API 키가 없을 때 규칙 기반 파서로 대체된다.
-
