@@ -1,0 +1,11 @@
+.env
+*.db
+*.sqlite3
+__pycache__/
+.pytest_cache/
+.streamlit/secrets.toml
+token.json
+credentials.json
+streamlit.out
+streamlit.err
+*.log
