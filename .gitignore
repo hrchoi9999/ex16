@@ -6,6 +6,8 @@ __pycache__/
 .streamlit/secrets.toml
 token.json
 credentials.json
+data/google_token.json
+data/google_oauth_states.json
 streamlit.out
 streamlit.err
 *.log

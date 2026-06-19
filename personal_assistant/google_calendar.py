@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -44,6 +45,7 @@ class GoogleOAuthStartResult:
     message: str
     authorization_url: str = ""
     state: str = ""
+    code_verifier: str = ""
 
 
 class GoogleCalendarClient:
@@ -64,6 +66,57 @@ class GoogleCalendarClient:
         if name.startswith("client_secret_") or "apps.googleusercontent.com" in name:
             return Path("data/google_token.json")
         return configured
+
+    @staticmethod
+    def _oauth_state_path() -> Path:
+        return Path("data/google_oauth_states.json")
+
+    @classmethod
+    def _remember_oauth_state(cls, state: str, code_verifier: str) -> None:
+        if not state or not code_verifier:
+            return
+        path = cls._oauth_state_path()
+        states: dict[str, dict[str, str]] = {}
+        if path.exists():
+            try:
+                states = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                states = {}
+
+        now = datetime.now(timezone.utc)
+        fresh_states: dict[str, dict[str, str]] = {}
+        for key, value in states.items():
+            try:
+                created_at = datetime.fromisoformat(value.get("created_at", ""))
+            except ValueError:
+                continue
+            if now - created_at < timedelta(minutes=15):
+                fresh_states[key] = value
+
+        fresh_states[state] = {
+            "code_verifier": code_verifier,
+            "created_at": now.isoformat(),
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(fresh_states), encoding="utf-8")
+
+    @classmethod
+    def _pop_oauth_code_verifier(cls, state: str) -> str:
+        if not state:
+            return ""
+        path = cls._oauth_state_path()
+        if not path.exists():
+            return ""
+        try:
+            states = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return ""
+        value = states.pop(state, {})
+        try:
+            path.write_text(json.dumps(states), encoding="utf-8")
+        except OSError:
+            pass
+        return value.get("code_verifier", "")
 
     def _service(self):
         from googleapiclient.discovery import build
@@ -103,11 +156,17 @@ class GoogleCalendarClient:
         return credentials
 
     @staticmethod
-    def _oauth_flow(flow_class):
+    def _oauth_flow(flow_class, state: str = "", code_verifier: str = ""):
+        kwargs = {}
+        if state:
+            kwargs["state"] = state
+        if code_verifier:
+            kwargs["code_verifier"] = code_verifier
         if settings.google_oauth_client_secret_file:
             flow = flow_class.from_client_secrets_file(
                 settings.google_oauth_client_secret_file,
                 CALENDAR_SCOPES,
+                **kwargs,
             )
         else:
             redirect_uri = GoogleCalendarClient._redirect_uri()
@@ -120,7 +179,7 @@ class GoogleCalendarClient:
                     "redirect_uris": [redirect_uri],
                 }
             }
-            flow = flow_class.from_client_config(client_config, CALENDAR_SCOPES)
+            flow = flow_class.from_client_config(client_config, CALENDAR_SCOPES, **kwargs)
         flow.redirect_uri = GoogleCalendarClient._redirect_uri()
         return flow
 
@@ -152,23 +211,31 @@ class GoogleCalendarClient:
         if login_hint:
             kwargs["login_hint"] = login_hint
         authorization_url, state = flow.authorization_url(**kwargs)
+        code_verifier = flow.code_verifier or ""
+        self._remember_oauth_state(state, code_verifier)
         return GoogleOAuthStartResult(
             enabled=True,
             success=True,
             message="Google 로그인 화면을 열어 Calendar 권한에 동의하세요. 동의 후 이 앱으로 자동 돌아옵니다.",
             authorization_url=authorization_url,
             state=state,
+            code_verifier=code_verifier,
         )
 
-    def finish_oauth(self, code: str, state: str = "") -> GoogleAccountResult:
+    def finish_oauth(self, code: str, state: str = "", code_verifier: str = "") -> GoogleAccountResult:
         if not settings.google_oauth_enabled:
             return GoogleAccountResult(False, False, "Google OAuth 클라이언트 설정이 없습니다.")
         try:
             from google_auth_oauthlib.flow import Flow
 
-            flow = self._oauth_flow(Flow)
-            if state:
-                flow.oauth2session.state = state
+            verifier = code_verifier or self._pop_oauth_code_verifier(state)
+            if not verifier:
+                return GoogleAccountResult(
+                    True,
+                    False,
+                    "Google OAuth 인증 정보가 만료되었습니다. Google 로그인 링크를 새로 만든 뒤 다시 로그인하세요.",
+                )
+            flow = self._oauth_flow(Flow, state=state, code_verifier=verifier)
             flow.fetch_token(code=code)
             credentials = flow.credentials
             token_path = self._token_path()

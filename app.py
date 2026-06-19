@@ -48,6 +48,7 @@ def init_state() -> None:
     st.session_state.setdefault("last_site_collection_at", None)
     st.session_state.setdefault("google_auth_url", "")
     st.session_state.setdefault("google_auth_state", "")
+    st.session_state.setdefault("google_code_verifier", "")
 
     query_view = st.query_params.get("view")
     query_date = st.query_params.get("date")
@@ -76,12 +77,21 @@ def handle_google_oauth_callback() -> None:
     if not code:
         return
 
-    result = calendar_client.finish_oauth(code=code, state=state)
+    result = calendar_client.finish_oauth(
+        code=code,
+        state=state,
+        code_verifier=st.session_state.google_code_verifier,
+    )
     if result.success:
         store.register_user(email=result.email or "google-user", display_name=result.display_name)
         st.session_state.google_auth_url = ""
         st.session_state.google_auth_state = ""
+        st.session_state.google_code_verifier = ""
         import_google_events_for_current_period()
+    else:
+        st.session_state.google_auth_url = ""
+        st.session_state.google_auth_state = ""
+        st.session_state.google_code_verifier = ""
     st.session_state.sync_message = result.message
     st.session_state.right_menu = "Google 연동"
     st.query_params.clear()
@@ -652,11 +662,13 @@ def render_left(events: list[ScheduleEvent]) -> None:
         if result.success:
             st.session_state.google_auth_url = result.authorization_url
             st.session_state.google_auth_state = result.state
+            st.session_state.google_code_verifier = result.code_verifier
     if st.button("Google 로그인 링크 새로 만들기", use_container_width=True):
         result = calendar_client.start_oauth(login_hint=google_email.strip())
         if result.success:
             st.session_state.google_auth_url = result.authorization_url
             st.session_state.google_auth_state = result.state
+            st.session_state.google_code_verifier = result.code_verifier
         st.session_state.sync_message = result.message
         st.session_state.right_menu = "Google 연동"
         st.rerun()
@@ -1063,6 +1075,7 @@ def render_google_tools() -> None:
             if result.success:
                 st.session_state.google_auth_url = result.authorization_url
                 st.session_state.google_auth_state = result.state
+                st.session_state.google_code_verifier = result.code_verifier
             st.session_state.sync_message = result.message
             st.rerun()
         if st.session_state.google_auth_url:

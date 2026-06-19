@@ -85,6 +85,23 @@ QA 기준:
 - 테스트 사용자가 아닌 Gmail 계정으로 로그인하면 접근 제한 또는 검증 관련 오류가 날 수 있음을 안내한다.
 - Production 배포 전에는 Google 검증이 필요하다는 안내가 남아 있어야 한다.
 
+## `invalid_grant: Missing code verifier` 처리
+
+이 오류는 Google 로그인 URL 생성 시 만들어진 PKCE `code_verifier`가 OAuth callback 처리 시점에 전달되지 않을 때 발생한다. 관리자 설정 문제가 아니라 앱의 로그인 상태 보관 문제로 분류한다.
+
+개발 지시:
+
+- OAuth authorization URL을 만들 때 `state`와 `code_verifier`를 함께 저장한다.
+- Streamlit 세션이 바뀔 수 있으므로 `state`별 임시 파일에도 verifier를 15분 동안 보관한다.
+- callback에서 `state`로 verifier를 찾아 `fetch_token` 호출에 사용한다.
+- verifier가 없으면 기존 인증 URL을 폐기하고 새 Google 로그인 링크 생성을 안내한다.
+
+QA 기준:
+
+- Google 로그인 URL 생성 후 callback에서 `Missing code verifier`가 발생하지 않아야 한다.
+- 같은 인증 URL을 오래 두었다가 재사용하면 새 로그인 링크 생성을 안내해야 한다.
+- `data/google_oauth_states.json`과 `data/google_token.json`은 git에 포함되지 않아야 한다.
+
 ## 프로세스 1: 앱 최초 실행
 
 목표: 운영 설정 상태를 판별하고 다음 행동을 명확히 안내한다.
