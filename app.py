@@ -21,6 +21,7 @@ st.set_page_config(page_title="AI Scheduler", page_icon=":calendar:", layout="wi
 
 VIEW_TITLES = {"day": "일 보기", "week": "주 보기", "month": "월 보기"}
 WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
+RIGHT_MENUS = ["상세 정보", "일정 편집", "AI 일정", "Google 연동", "관심 사이트", "우선순위"]
 
 
 @st.cache_resource
@@ -37,12 +38,14 @@ def init_state() -> None:
     today = date.today()
     st.session_state.setdefault("selected_date", today)
     st.session_state.setdefault("view_mode", "month")
+    st.session_state.setdefault("right_menu", "상세 정보")
     st.session_state.setdefault("sync_message", "")
     st.session_state.setdefault("site_message", "")
-    st.session_state.setdefault("chat_answer", "")
+    st.session_state.setdefault("chat_history", [])
     st.session_state.setdefault("highlight_event_ids", [])
     st.session_state.setdefault("show_day_dialog", False)
     st.session_state.setdefault("last_site_collection_at", None)
+
     query_view = st.query_params.get("view")
     query_date = st.query_params.get("date")
     query_dialog = st.query_params.get("dialog")
@@ -55,6 +58,7 @@ def init_state() -> None:
             pass
     if query_dialog == "1":
         st.session_state.show_day_dialog = True
+        st.session_state.right_menu = "일정 편집"
 
 
 def inject_styles() -> None:
@@ -65,15 +69,14 @@ def inject_styles() -> None:
             --bg: #f8f9fa;
             --pane: #ffffff;
             --side: #eaf1ff;
+            --right: #f3f6fd;
             --line: #d6dbe8;
             --line-soft: #e8ecf4;
             --text: #0f172a;
             --muted: #596275;
             --primary: #2563eb;
-            --primary-dark: #0f172a;
-            --green: #16a34a;
-            --amber: #b7791f;
-            --red: #dc2626;
+            --primary-soft: rgba(37,99,235,.12);
+            --amber-soft: #fff3bf;
             --font: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", Inter, Roboto, Arial, sans-serif;
         }
         html, body, .stApp, [data-testid="stAppViewContainer"] {
@@ -88,21 +91,23 @@ def inject_styles() -> None:
         }
         .block-container {
             padding: 0 !important;
-            max-width: 100% !important;
-            min-width: 1280px !important;
+            max-width: none !important;
+            width: 100vw !important;
+            min-width: 1320px !important;
         }
-        [data-testid="stAppViewContainer"],
-        [data-testid="stMain"] {
+        [data-testid="stAppViewContainer"], [data-testid="stMain"] {
             overflow-x: auto !important;
         }
-        [data-testid="stHorizontalBlock"]:has(.left-shell) {
+        [data-testid="stHorizontalBlock"]:has(.layout-anchor) {
+            display: flex !important;
             flex-direction: row !important;
             flex-wrap: nowrap !important;
-            align-items: stretch !important;
-            min-width: 1280px !important;
             gap: 0 !important;
+            align-items: stretch !important;
+            width: 100% !important;
+            min-width: 1320px !important;
         }
-        [data-testid="stHorizontalBlock"]:has(.left-shell) > [data-testid="stColumn"]:nth-child(1) {
+        [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(1) {
             flex: 0 0 260px !important;
             width: 260px !important;
             min-width: 260px !important;
@@ -111,40 +116,28 @@ def inject_styles() -> None:
             border-right: 1px solid var(--line) !important;
             padding: 24px 22px !important;
         }
-        [data-testid="stHorizontalBlock"]:has(.left-shell) > [data-testid="stColumn"]:nth-child(2) {
-            flex: 0 0 720px !important;
-            width: 720px !important;
-            min-width: 720px !important;
+        [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(2) {
+            flex: 1 1 auto !important;
+            width: auto !important;
+            min-width: 640px !important;
             box-sizing: border-box !important;
             background: var(--pane) !important;
             border-right: 1px solid var(--line) !important;
         }
-        [data-testid="stHorizontalBlock"]:has(.left-shell) > [data-testid="stColumn"]:nth-child(3) {
-            flex: 0 0 340px !important;
-            width: 340px !important;
-            min-width: 340px !important;
+        [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(3) {
+            flex: 0 0 500px !important;
+            width: 500px !important;
+            min-width: 500px !important;
             box-sizing: border-box !important;
-            background: #f3f6fd !important;
-            padding: 22px !important;
+            background: var(--right) !important;
+            padding: 18px 20px !important;
         }
         * {
             letter-spacing: 0 !important;
             font-family: var(--font) !important;
         }
-        .app-shell {
-            display: grid;
-            grid-template-columns: 252px minmax(620px, 1fr) 348px;
-            min-height: 100vh;
-            background: var(--pane);
-        }
-        .left-shell {
-            display: none !important;
-        }
-        .center-shell {
-            display: none !important;
-        }
-        .right-shell {
-            display: none !important;
+        .layout-anchor {
+            display: none;
         }
         .brand {
             display: flex;
@@ -157,7 +150,7 @@ def inject_styles() -> None:
             height: 42px;
             border-radius: 8px;
             background: var(--primary);
-            color: white;
+            color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -166,8 +159,8 @@ def inject_styles() -> None:
         .brand-title {
             margin: 0;
             color: var(--primary);
-            font-weight: 900;
             font-size: 1.05rem;
+            font-weight: 900;
         }
         .brand-subtitle {
             margin: 2px 0 0;
@@ -175,7 +168,7 @@ def inject_styles() -> None:
             font-size: .82rem;
         }
         .section-label {
-            color: var(--primary-dark);
+            color: var(--text);
             font-size: .72rem;
             font-weight: 900;
             text-transform: uppercase;
@@ -206,15 +199,12 @@ def inject_styles() -> None:
             color: var(--text);
             font-weight: 900;
         }
-        .calendar-header {
-            padding: 24px 26px 18px;
-            border-bottom: 1px solid var(--line);
-        }
-        .calendar-title-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+        .calendar-nav {
+            display: grid;
+            grid-template-columns: 46px minmax(0, 1fr) 46px;
             gap: 12px;
+            align-items: center;
+            padding: 22px 24px 14px;
         }
         .calendar-title {
             margin: 0;
@@ -224,17 +214,20 @@ def inject_styles() -> None:
         .calendar-subtitle {
             margin: 6px 0 0;
             color: var(--muted);
+            font-size: .9rem;
         }
-        .pill {
-            display: inline-flex;
+        .nav-square {
+            display: flex;
+            height: 38px;
             align-items: center;
-            gap: 4px;
-            padding: 4px 8px;
+            justify-content: center;
+            border: 1px solid var(--line);
             border-radius: 8px;
-            background: #edf2fb;
-            color: var(--muted);
-            font-size: .72rem;
-            font-weight: 800;
+            color: var(--text) !important;
+            text-decoration: none !important;
+            background: #fff;
+            font-size: 1.35rem;
+            font-weight: 900;
         }
         .month-grid {
             display: grid;
@@ -262,7 +255,7 @@ def inject_styles() -> None:
             text-decoration: none !important;
             overflow: hidden;
         }
-        .day-link:hover {
+        .day-link:hover, .day-link.selected {
             background: #eef5ff;
         }
         .day-link.outside {
@@ -272,37 +265,17 @@ def inject_styles() -> None:
         .day-link.today {
             box-shadow: inset 0 0 0 2px var(--primary);
         }
-        .day-link.selected {
-            background: #eef5ff;
-        }
         .day-number-text {
             display: block;
             font-weight: 900;
             margin-bottom: 6px;
-        }
-        .day-box {
-            min-height: 112px;
-            padding: 8px;
-            border-right: 1px solid var(--line-soft);
-            border-bottom: 1px solid var(--line-soft);
-            background: #fff;
-        }
-        .day-box.outside {
-            background: #f8fafc;
-            opacity: .55;
-        }
-        .day-box.today {
-            box-shadow: inset 0 0 0 2px var(--primary);
-        }
-        .day-box.selected {
-            background: #eef5ff;
         }
         .event-pill {
             display: block;
             margin-top: 5px;
             padding: 4px 6px;
             border-radius: 6px;
-            background: rgba(37,99,235,.12);
+            background: var(--primary-soft);
             color: var(--primary);
             font-size: .72rem;
             white-space: nowrap;
@@ -311,7 +284,7 @@ def inject_styles() -> None:
         }
         .event-pill.highlight {
             animation: blink-event 1s ease-in-out infinite;
-            background: #fff3bf;
+            background: var(--amber-soft);
             color: #7a4b00;
         }
         @keyframes blink-event {
@@ -321,26 +294,6 @@ def inject_styles() -> None:
         .week-grid {
             display: grid;
             grid-template-columns: 58px repeat(7, minmax(0, 1fr));
-        }
-        .calendar-nav {
-            display: grid;
-            grid-template-columns: 46px minmax(0, 1fr) 46px;
-            gap: 12px;
-            align-items: center;
-            padding: 22px 24px 14px;
-        }
-        .nav-square {
-            display: flex;
-            height: 38px;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            color: var(--text) !important;
-            text-decoration: none !important;
-            background: #fff;
-            font-size: 1.35rem;
-            font-weight: 900;
         }
         .week-head-link {
             display: block;
@@ -352,9 +305,6 @@ def inject_styles() -> None:
             background: #f2f5fb;
             border-left: 1px solid var(--line-soft);
             border-bottom: 1px solid var(--line-soft);
-        }
-        .week-head-link:hover {
-            background: #e8f0ff;
         }
         .time-cell {
             height: 54px;
@@ -375,8 +325,8 @@ def inject_styles() -> None:
             left: 6px;
             right: 6px;
             border-left: 4px solid var(--primary);
-            background: rgba(37,99,235,.12);
-            color: var(--primary-dark);
+            background: var(--primary-soft);
+            color: var(--text);
             border-radius: 8px;
             padding: 7px 8px;
             overflow: hidden;
@@ -385,23 +335,47 @@ def inject_styles() -> None:
         }
         .timeline-event.highlight {
             animation: blink-event 1s ease-in-out infinite;
-            background: #fff3bf;
+            background: var(--amber-soft);
         }
-        .card {
-            background: #fff;
+        .right-title {
+            margin: 0 0 12px;
+            font-size: 1.35rem;
+            font-weight: 900;
+        }
+        .right-content {
+            height: 560px;
+            overflow-y: auto;
+            padding: 14px;
             border: 1px solid var(--line);
             border-radius: 10px;
-            padding: 14px;
-            margin-bottom: 14px;
+            background: #fff;
+        }
+        .right-chat {
+            margin-top: 14px;
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fff;
+        }
+        .right-chat-title {
+            margin: 0 0 8px;
+            font-weight: 900;
+            font-size: .92rem;
+        }
+        .info-card {
+            border: 1px solid var(--line-soft);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #fff;
+        }
+        .info-card-title {
+            margin: 0 0 6px;
+            font-weight: 900;
         }
         .muted {
             color: var(--muted);
             font-size: .84rem;
-        }
-        .bottom-shell {
-            border-top: 1px solid var(--line);
-            background: #fff;
-            padding: 18px 24px 24px;
         }
         .small-note {
             color: var(--muted);
@@ -411,12 +385,27 @@ def inject_styles() -> None:
             border-radius: 8px !important;
             font-weight: 800 !important;
         }
-        .left-shell .stButton > button {
-            justify-content: flex-start;
+        div[role="radiogroup"] {
+            gap: .35rem !important;
+        }
+        div[role="radiogroup"] label {
+            min-height: 2.25rem !important;
+            padding: .25rem .45rem !important;
+            border: 1px solid var(--line) !important;
+            border-radius: 8px !important;
+            background: #fff !important;
+        }
+        [data-testid="stDialog"] [data-testid="stVerticalBlock"] {
+            gap: .7rem !important;
+        }
+        [data-testid="stDialog"] h1,
+        [data-testid="stDialog"] h2,
+        [data-testid="stDialog"] h3 {
+            line-height: 1.25 !important;
         }
         @media (max-width: 1100px) {
             .block-container {
-                min-width: 1280px !important;
+                min-width: 1320px !important;
             }
         }
         </style>
@@ -459,6 +448,19 @@ def events_in_period(events: list[ScheduleEvent], start_at: datetime, end_at: da
 
 def compact(text: str, limit: int = 22) -> str:
     return text[:limit] + "..." if len(text) > limit else text
+
+
+def calendar_href(target_date: date, view_mode: str, dialog: bool = False) -> str:
+    suffix = "&dialog=1" if dialog else ""
+    return f"?view={view_mode}&date={target_date.isoformat()}{suffix}"
+
+
+def shifted_date(selected: date, view_mode: str, direction: int) -> date:
+    if view_mode == "month":
+        return add_months(selected, direction)
+    if view_mode == "week":
+        return selected + timedelta(days=7 * direction)
+    return selected + timedelta(days=direction)
 
 
 def run_auto_site_collection() -> None:
@@ -509,6 +511,15 @@ def delete_event(event: ScheduleEvent) -> None:
     st.session_state.sync_message = sync.message
 
 
+def parse_period(period: str) -> tuple[date, date]:
+    matches = re.findall(r"(20\d{2})[.년/-]\s*(\d{1,2})[.월/-]\s*(\d{1,2})", period)
+    if matches:
+        first = date(*map(int, matches[0]))
+        last = date(*map(int, matches[-1]))
+        return first, max(first, last)
+    return date.today(), date.today()
+
+
 def candidate_to_event(candidate: ExternalScheduleCandidate) -> ScheduleEvent:
     start_day, end_day = parse_period(candidate.recruitment_period)
     return ScheduleEvent(
@@ -523,62 +534,6 @@ def candidate_to_event(candidate: ExternalScheduleCandidate) -> ScheduleEvent:
         source_url=candidate.url,
         sync_status="local",
     )
-
-
-def parse_period(period: str) -> tuple[date, date]:
-    matches = re.findall(r"(20\d{2})[.년/-]\s*(\d{1,2})[.월/-]\s*(\d{1,2})", period)
-    if matches:
-        first = date(*map(int, matches[0]))
-        last = date(*map(int, matches[-1]))
-        return first, max(first, last)
-    return date.today(), date.today()
-
-
-def render_left(events: list[ScheduleEvent]) -> None:
-    st.markdown(
-        """
-        <div class="brand">
-            <div class="brand-icon">AI</div>
-            <div>
-                <p class="brand-title">AI Scheduler</p>
-                <p class="brand-subtitle">개인 일정 관리 · PC Workspace</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown("<p class='section-label'>Calendar View</p>", unsafe_allow_html=True)
-    for view_mode, label in [("month", "월 보기"), ("week", "주 보기"), ("day", "일 보기")]:
-        button_type = "primary" if st.session_state.view_mode == view_mode else "secondary"
-        if st.button(label, key=f"view_{view_mode}", type=button_type, use_container_width=True):
-            st.session_state.view_mode = view_mode
-            st.rerun()
-
-    st.markdown("<p class='section-label'>Google Account</p>", unsafe_allow_html=True)
-    active_user = store.get_active_user()
-    st.caption(active_user.email if active_user else "등록된 Google 계정 없음")
-    google_email = st.text_input("Google 이메일", value=settings.google_registered_email, placeholder="name@gmail.com")
-    if st.button("Google 계정 등록/연동", use_container_width=True):
-        result = calendar_client.register_account()
-        if result.success:
-            email = google_email.strip() or result.email or "google-user"
-            store.register_user(email=email, display_name=result.display_name)
-            import_google_events_for_current_period()
-        st.session_state.sync_message = result.message
-        st.rerun()
-
-    st.markdown("<p class='section-label'>Interest Sites</p>", unsafe_allow_html=True)
-    if st.button("관심 사이트 지금 수집", use_container_width=True):
-        result = collect_interest_sites()
-        for candidate in result.candidates:
-            store.upsert_candidate(candidate)
-        st.session_state.last_site_collection_at = datetime.now()
-        st.session_state.site_message = result.message
-        st.rerun()
-    st.caption(st.session_state.site_message or "서버 시작 후 1회, 이후 3시간마다 자동 수집합니다.")
-
-    st.markdown("<p class='section-label'>Mini Calendar</p>", unsafe_allow_html=True)
-    st.markdown(mini_calendar_html(events), unsafe_allow_html=True)
 
 
 def mini_calendar_html(events: list[ScheduleEvent]) -> str:
@@ -602,18 +557,71 @@ def mini_calendar_html(events: list[ScheduleEvent]) -> str:
     return "".join(parts)
 
 
+def render_left(events: list[ScheduleEvent]) -> None:
+    st.html('<span class="layout-anchor"></span>')
+    st.markdown(
+        """
+        <div class="brand">
+            <div class="brand-icon">AI</div>
+            <div>
+                <p class="brand-title">AI Scheduler</p>
+                <p class="brand-subtitle">개인 일정 관리 · PC Workspace</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("<p class='section-label'>Calendar View</p>", unsafe_allow_html=True)
+    for view_mode, label in [("month", "월 보기"), ("week", "주 보기"), ("day", "일 보기")]:
+        button_type = "primary" if st.session_state.view_mode == view_mode else "secondary"
+        if st.button(label, key=f"view_{view_mode}", type=button_type, use_container_width=True):
+            st.session_state.view_mode = view_mode
+            st.query_params.clear()
+            st.rerun()
+
+    st.markdown("<p class='section-label'>Google Account</p>", unsafe_allow_html=True)
+    active_user = store.get_active_user()
+    st.caption(active_user.email if active_user else "등록된 Google 계정 없음")
+    google_email = st.text_input("Google 이메일", value=settings.google_registered_email, placeholder="name@gmail.com")
+    if st.button("Google 계정 등록/연동", use_container_width=True):
+        result = calendar_client.register_account()
+        if result.success:
+            email = google_email.strip() or result.email or "google-user"
+            store.register_user(email=email, display_name=result.display_name)
+            import_google_events_for_current_period()
+        st.session_state.sync_message = result.message
+        st.session_state.right_menu = "Google 연동"
+        st.rerun()
+
+    st.markdown("<p class='section-label'>Interest Sites</p>", unsafe_allow_html=True)
+    if st.button("관심 사이트 지금 수집", use_container_width=True):
+        result = collect_interest_sites()
+        for candidate in result.candidates:
+            store.upsert_candidate(candidate)
+        st.session_state.last_site_collection_at = datetime.now()
+        st.session_state.site_message = result.message
+        st.session_state.right_menu = "관심 사이트"
+        st.rerun()
+    st.caption(st.session_state.site_message or "서버 시작 후 1회, 이후 3시간마다 자동 수집합니다.")
+
+    st.markdown("<p class='section-label'>Mini Calendar</p>", unsafe_allow_html=True)
+    st.markdown(mini_calendar_html(events), unsafe_allow_html=True)
+
+
 def render_center(events: list[ScheduleEvent]) -> None:
     selected = st.session_state.selected_date
     view_mode = st.session_state.view_mode
     start_at, end_at = period_bounds(selected, view_mode)
     visible_events = events_in_period(events, start_at, end_at)
-
-    title = f"{selected:%Y년 %m월}" if view_mode == "month" else (
-        f"{week_start(selected):%Y.%m.%d} - {(week_start(selected) + timedelta(days=6)):%m.%d}"
-        if view_mode == "week"
-        else f"{selected:%Y년 %m월 %d일}"
+    title = (
+        f"{selected:%Y년 %m월}"
+        if view_mode == "month"
+        else (
+            f"{week_start(selected):%Y.%m.%d} - {(week_start(selected) + timedelta(days=6)):%m.%d}"
+            if view_mode == "week"
+            else f"{selected:%Y년 %m월 %d일}"
+        )
     )
-
     previous_date = shifted_date(selected, view_mode, -1)
     next_date = shifted_date(selected, view_mode, 1)
     st.markdown(
@@ -629,26 +637,12 @@ def render_center(events: list[ScheduleEvent]) -> None:
         """,
         unsafe_allow_html=True,
     )
-
     if view_mode == "month":
         render_month(events, selected)
     elif view_mode == "week":
         render_week(events, selected)
     else:
         render_day(events, selected)
-
-
-def shifted_date(selected: date, view_mode: str, direction: int) -> date:
-    if view_mode == "month":
-        return add_months(selected, direction)
-    if view_mode == "week":
-        return selected + timedelta(days=7 * direction)
-    return selected + timedelta(days=direction)
-
-
-def calendar_href(target_date: date, view_mode: str, dialog: bool = False) -> str:
-    suffix = "&dialog=1" if dialog else ""
-    return f"?view={view_mode}&date={target_date.isoformat()}{suffix}"
 
 
 def render_month(events: list[ScheduleEvent], selected: date) -> None:
@@ -695,7 +689,7 @@ def render_week(events: list[ScheduleEvent], selected: date) -> None:
         body = "".join(timeline_event_html(event) for event in events_for_day(events, day))
         grid_parts.append(f"<div class='week-col'>{body}</div>")
     grid_parts.append("</div>")
-    st.markdown("".join(grid_parts), unsafe_allow_html=True)
+    st.html("".join(grid_parts))
 
 
 def render_day(events: list[ScheduleEvent], selected: date) -> None:
@@ -703,11 +697,10 @@ def render_day(events: list[ScheduleEvent], selected: date) -> None:
     grid_parts = ["<div class='week-grid' style='grid-template-columns:58px minmax(0,1fr);'><div>"]
     for hour in range(7, 21):
         grid_parts.append(f"<div class='time-cell'>{hour:02d}:00</div>")
-    grid_parts.append("</div>")
-    grid_parts.append("<div class='week-col'>")
+    grid_parts.append("</div><div class='week-col'>")
     grid_parts.extend(timeline_event_html(event) for event in day_events)
     grid_parts.append("</div></div>")
-    st.markdown("".join(grid_parts), unsafe_allow_html=True)
+    st.html("".join(grid_parts))
 
 
 def event_pill_html(event: ScheduleEvent) -> str:
@@ -728,23 +721,80 @@ def timeline_event_html(event: ScheduleEvent) -> str:
 
 
 def render_right(events: list[ScheduleEvent]) -> None:
-    st.markdown("### 작업 메뉴")
-    render_event_editor(events)
-    render_google_tools()
-    render_candidates()
-    render_recommendations(events)
+    st.markdown("<h2 class='right-title'>작업 메뉴</h2>", unsafe_allow_html=True)
+    menu = st.radio(
+        "메뉴 선택",
+        RIGHT_MENUS,
+        index=RIGHT_MENUS.index(st.session_state.right_menu),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="right_menu_radio",
+    )
+    st.session_state.right_menu = menu
+    with st.container(height=560, border=True):
+        render_right_content(events, menu)
+    render_ai_chat_input(events)
+
+
+def render_right_content(events: list[ScheduleEvent], menu: str) -> None:
+    if menu == "상세 정보":
+        render_selected_detail(events)
+        render_chat_history()
+    elif menu == "일정 편집":
+        render_event_editor(events)
+    elif menu == "AI 일정":
+        render_ai_event_creator()
+        render_chat_history()
+    elif menu == "Google 연동":
+        render_google_tools()
+    elif menu == "관심 사이트":
+        render_candidates()
+    elif menu == "우선순위":
+        render_recommendations(events)
+
+
+def render_selected_detail(events: list[ScheduleEvent]) -> None:
+    selected = st.session_state.selected_date
+    day_events = events_for_day(events, selected)
+    st.markdown(f"### {selected:%Y-%m-%d} 상세")
+    if not day_events:
+        st.caption("선택된 날짜에 일정이 없습니다.")
+        return
+    for event in day_events:
+        st.markdown(
+            f"""
+            <div class="info-card">
+                <p class="info-card-title">{escape(event.time_label)} · {escape(event.title)}</p>
+                <p class="muted">중요도 {event.importance} · 출처 {escape(event.source)}</p>
+                <p class="muted">{escape(event.description or '설명 없음')}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def render_chat_history() -> None:
+    if not st.session_state.chat_history:
+        st.caption("AI 채팅 대화가 아직 없습니다.")
+        return
+    st.markdown("### AI 채팅 기록")
+    for item in st.session_state.chat_history[-8:]:
+        st.markdown(f"**사용자**: {item['question']}")
+        st.info(item["answer"])
 
 
 def render_event_editor(events: list[ScheduleEvent], prefix: str = "main") -> None:
     selected = st.session_state.selected_date
     day_events = events_for_day(events, selected)
-    with st.expander(f"{selected:%Y-%m-%d} 일정/작업 입력", expanded=True):
+    st.markdown(f"### {selected:%Y-%m-%d} 일정/작업 입력")
+    with st.form(f"{prefix}_create_form", clear_on_submit=True):
         title = st.text_input("제목", key=f"{prefix}_manual_title")
         start_time = st.time_input("시작 시간", value=time(9, 0), key=f"{prefix}_manual_time")
         duration = st.number_input("소요 시간(분)", 15, 720, 60, 15, key=f"{prefix}_manual_duration")
         importance = st.slider("중요도", 1, 5, 3, key=f"{prefix}_manual_importance")
         description = st.text_area("설명", key=f"{prefix}_manual_description", height=80)
-        if st.button("일정 등록", type="primary", use_container_width=True, key=f"{prefix}_manual_submit"):
+        submitted = st.form_submit_button("일정 등록", type="primary", use_container_width=True)
+        if submitted:
             if not title.strip():
                 st.warning("제목을 입력해 주세요.")
             else:
@@ -761,107 +811,101 @@ def render_event_editor(events: list[ScheduleEvent], prefix: str = "main") -> No
                 )
                 st.rerun()
 
-    with st.expander("AI 일정 등록", expanded=False):
-        command = st.text_area("AI 명령", placeholder="다음 주 화요일 오후 2시에 회의 등록해줘.", height=80, key=f"{prefix}_ai_command")
-        if st.button("AI 명령으로 등록", type="primary", use_container_width=True, key=f"{prefix}_ai_submit"):
-            parsed = parser.parse(command)
-            if parsed.event is None:
-                st.info(parsed.message)
-            else:
-                create_event(parsed.event)
-                st.success("일정을 등록했습니다.")
+    st.markdown("### 선택 날짜 일정 수정/삭제")
+    if not day_events:
+        st.caption("선택된 날짜에 등록된 일정이 없습니다.")
+    for event in day_events:
+        with st.form(f"{prefix}_edit_event_{event.id}"):
+            st.markdown(f"**{event.title}**")
+            updated_title = st.text_input("제목", value=event.title, key=f"{prefix}_title_{event.id}")
+            updated_time = st.time_input("시작 시간", value=event.start_at.time(), key=f"{prefix}_time_{event.id}")
+            updated_minutes = max(int((event.end_at - event.start_at).total_seconds() // 60), 15)
+            updated_duration = st.number_input("소요 시간(분)", 15, 720, updated_minutes, 15, key=f"{prefix}_duration_{event.id}")
+            updated_importance = st.slider("중요도", 1, 5, event.importance, key=f"{prefix}_importance_{event.id}")
+            updated_description = st.text_area("설명", value=event.description, key=f"{prefix}_description_{event.id}", height=70)
+            save_col, delete_col = st.columns(2)
+            save = save_col.form_submit_button("수정 저장", use_container_width=True)
+            remove = delete_col.form_submit_button("삭제", use_container_width=True)
+            if save:
+                start_at = datetime.combine(st.session_state.selected_date, updated_time)
+                update_event(
+                    event,
+                    title=updated_title.strip(),
+                    start_at=start_at,
+                    end_at=start_at + timedelta(minutes=int(updated_duration)),
+                    description=updated_description.strip(),
+                    importance=int(updated_importance),
+                )
+                st.rerun()
+            if remove:
+                delete_event(event)
                 st.rerun()
 
-    with st.expander("선택 날짜 일정 수정/삭제", expanded=bool(day_events)):
-        if not day_events:
-            st.caption("선택된 날짜에 등록된 일정이 없습니다.")
-        for event in day_events:
-            with st.form(f"{prefix}_edit_event_{event.id}"):
-                st.markdown(f"**{event.title}**")
-                updated_title = st.text_input("제목", value=event.title, key=f"{prefix}_title_{event.id}")
-                updated_time = st.time_input("시작 시간", value=event.start_at.time(), key=f"{prefix}_time_{event.id}")
-                updated_minutes = max(int((event.end_at - event.start_at).total_seconds() // 60), 15)
-                updated_duration = st.number_input("소요 시간(분)", 15, 720, updated_minutes, 15, key=f"{prefix}_duration_{event.id}")
-                updated_importance = st.slider("중요도", 1, 5, event.importance, key=f"{prefix}_importance_{event.id}")
-                updated_description = st.text_area("설명", value=event.description, key=f"{prefix}_description_{event.id}", height=70)
-                save_col, delete_col = st.columns(2)
-                save = save_col.form_submit_button("수정 저장", use_container_width=True)
-                remove = delete_col.form_submit_button("삭제", use_container_width=True)
-                if save:
-                    start_at = datetime.combine(st.session_state.selected_date, updated_time)
-                    update_event(
-                        event,
-                        title=updated_title.strip(),
-                        start_at=start_at,
-                        end_at=start_at + timedelta(minutes=int(updated_duration)),
-                        description=updated_description.strip(),
-                        importance=int(updated_importance),
-                    )
-                    st.rerun()
-                if remove:
-                    delete_event(event)
-                    st.rerun()
+
+def render_ai_event_creator() -> None:
+    st.markdown("### AI 일정 등록")
+    command = st.text_area("AI 명령", placeholder="다음 주 화요일 오후 2시에 회의 등록해줘.", height=90)
+    if st.button("AI 명령으로 등록", type="primary", use_container_width=True):
+        parsed = parser.parse(command)
+        if parsed.event is None:
+            st.info(parsed.message)
+        else:
+            create_event(parsed.event)
+            st.success("일정을 등록했습니다.")
+            st.rerun()
 
 
 def render_google_tools() -> None:
-    with st.expander("Google Calendar 연동", expanded=False):
-        active_user = store.get_active_user()
-        st.caption(f"등록 계정: {active_user.email}" if active_user else "Google 계정을 먼저 등록하세요.")
-        if st.button("현재 보기 범위 가져오기", use_container_width=True):
-            import_google_events_for_current_period()
-            st.rerun()
-        if st.session_state.sync_message:
-            st.info(st.session_state.sync_message)
+    st.markdown("### Google Calendar 연동")
+    active_user = store.get_active_user()
+    st.caption(f"등록 계정: {active_user.email}" if active_user else "Google 계정을 먼저 등록하세요.")
+    if st.button("현재 보기 범위 가져오기", use_container_width=True):
+        import_google_events_for_current_period()
+        st.rerun()
+    if st.session_state.sync_message:
+        st.info(st.session_state.sync_message)
 
 
 def render_candidates() -> None:
-    with st.expander("관심 사이트 수집 후보", expanded=False):
-        candidates = store.list_candidates()
-        if not candidates:
-            st.caption("수집된 모집중 공고가 없습니다. 좌측에서 관심 사이트 수집을 실행하세요.")
-        for candidate in candidates[:20]:
-            st.markdown(f"**{candidate.title}**")
-            st.caption(f"{candidate.source} · {candidate.category} · {candidate.recruitment_period}")
-            st.link_button("원문 열기", candidate.url, use_container_width=True)
-            if st.button("이 공고를 일정에 등록", key=f"candidate_{candidate.id}", use_container_width=True):
-                event = candidate_to_event(candidate)
-                create_event(event)
-                store.mark_candidate_selected(int(candidate.id))
-                st.success("선택한 공고를 일정에 등록했습니다.")
-                st.rerun()
+    st.markdown("### 관심 사이트 수집 후보")
+    candidates = store.list_candidates()
+    if not candidates:
+        st.caption("수집된 모집중 공고가 없습니다. 좌측에서 관심 사이트 수집을 실행하세요.")
+        return
+    for candidate in candidates[:20]:
+        st.markdown(f"**{candidate.title}**")
+        st.caption(f"{candidate.source} · {candidate.category} · {candidate.recruitment_period}")
+        st.link_button("원문 열기", candidate.url, use_container_width=True)
+        if st.button("이 공고를 일정에 등록", key=f"candidate_{candidate.id}", use_container_width=True):
+            event = candidate_to_event(candidate)
+            create_event(event)
+            store.mark_candidate_selected(int(candidate.id))
+            st.success("선택한 공고를 일정에 등록했습니다.")
+            st.rerun()
 
 
 def render_recommendations(events: list[ScheduleEvent]) -> None:
-    with st.expander("우선순위 추천", expanded=False):
-        recommendations = recommend_priorities([event for event in events if event.end_at >= datetime.now()])
-        if not recommendations:
-            st.caption("추천할 예정 일정이 없습니다.")
-        for item in recommendations[:5]:
-            st.markdown(f"**{item.event.title}**")
-            st.caption(f"{item.reason} · 점수 {item.score}")
+    st.markdown("### 우선순위 추천")
+    recommendations = recommend_priorities([event for event in events if event.end_at >= datetime.now()])
+    if not recommendations:
+        st.caption("추천할 예정 일정이 없습니다.")
+        return
+    for item in recommendations[:8]:
+        st.markdown(f"**{item.event.title}**")
+        st.caption(f"{item.reason} · 점수 {item.score}")
 
 
-def render_bottom(events: list[ScheduleEvent]) -> None:
-    selected = st.session_state.selected_date
-    day_events = events_for_day(events, selected)
-    detail_col, chat_col = st.columns([1.05, 1], gap="large")
-    with detail_col:
-        st.markdown(f"#### {selected:%Y-%m-%d} 상세")
-        if not day_events:
-            st.caption("선택된 날짜에 일정이 없습니다.")
-        for event in day_events:
-            st.markdown(f"**{event.time_label} · {event.title}**")
-            st.caption(f"중요도 {event.importance} · 출처 {event.source} · {event.description or '설명 없음'}")
-    with chat_col:
-        st.markdown("#### AI 일정 채팅")
-        question = st.text_input("질문", placeholder="이번 주 면접 일정 알려줘")
-        if st.button("AI에게 질문", type="primary", use_container_width=True):
+def render_ai_chat_input(events: list[ScheduleEvent]) -> None:
+    with st.container(border=True):
+        st.markdown("**AI 채팅**")
+        chat_col, send_col = st.columns([0.78, 0.22], gap="small")
+        question = chat_col.text_input("AI 채팅 입력", placeholder="이번 주 면접 일정 알려줘", label_visibility="collapsed")
+        if send_col.button("전송", type="primary", use_container_width=True):
             result = answer_schedule_question(question, events)
-            st.session_state.chat_answer = result.answer
             st.session_state.highlight_event_ids = result.matched_event_ids
+            st.session_state.chat_history.append({"question": question, "answer": result.answer})
+            st.session_state.right_menu = "상세 정보"
             st.rerun()
-        if st.session_state.chat_answer:
-            st.info(st.session_state.chat_answer)
 
 
 @st.dialog("일정/작업 편집")
@@ -870,6 +914,7 @@ def day_editor_dialog(events: list[ScheduleEvent]) -> None:
     render_event_editor(events, prefix="dialog")
     if st.button("닫기", use_container_width=True):
         st.session_state.show_day_dialog = False
+        st.query_params.clear()
         st.rerun()
 
 
@@ -879,23 +924,13 @@ def main() -> None:
     run_auto_site_collection()
 
     all_events = store.list_events(include_past=True)
-
-    left, center, right = st.columns([0.18, 0.57, 0.25], gap="large")
+    left, center, right = st.columns([0.2, 0.48, 0.32], gap="small")
     with left:
-        st.markdown("<div class='left-shell'>", unsafe_allow_html=True)
         render_left(all_events)
-        st.markdown("</div>", unsafe_allow_html=True)
     with center:
-        st.markdown("<div class='center-shell'>", unsafe_allow_html=True)
         render_center(all_events)
-        st.markdown("<div class='bottom-shell'>", unsafe_allow_html=True)
-        render_bottom(all_events)
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
     with right:
-        st.markdown("<div class='right-shell'>", unsafe_allow_html=True)
         render_right(all_events)
-        st.markdown("</div>", unsafe_allow_html=True)
 
     if st.session_state.show_day_dialog:
         day_editor_dialog(all_events)
