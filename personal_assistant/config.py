@@ -25,7 +25,15 @@ class Settings:
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
 
     site_collection_interval_hours: int = int(os.getenv("SITE_COLLECTION_INTERVAL_HOURS", "3"))
-    seoul50plus_url: str = os.getenv("SEOUL50PLUS_URL", "https://www.50plus.or.kr/job.do")
+    seoul50plus_url: str = os.getenv("SEOUL50PLUS_URL", "https://www.50plus.or.kr/")
+    seoul50plus_training_url: str = os.getenv(
+        "SEOUL50PLUS_TRAINING_URL",
+        "https://www.50plus.or.kr/in_appList.do?bizSeUrl=IN49009&rcrtSeUrl=IN47002",
+    )
+    seoul50plus_job_support_url: str = os.getenv(
+        "SEOUL50PLUS_JOB_SUPPORT_URL",
+        "https://www.50plus.or.kr/in_appList.do?bizSeUrl=IN49001&rcrtSeUrl=IN47002",
+    )
     kstartup_url: str = os.getenv("KSTARTUP_URL", "https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do")
 
     @property

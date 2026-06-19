@@ -14,7 +14,7 @@ from personal_assistant.google_calendar import GoogleCalendarClient
 from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent
 from personal_assistant.nlp import CommandParser
 from personal_assistant.priority import recommend_priorities
-from personal_assistant.site_collector import collect_interest_sites
+from personal_assistant.site_collector import REQUESTED_SITE_SOURCES, collect_interest_sites
 
 
 st.set_page_config(page_title="AI Scheduler", page_icon=":calendar:", layout="wide")
@@ -108,13 +108,17 @@ def inject_styles() -> None:
             min-width: 1320px !important;
         }
         [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(1) {
-            flex: 0 0 260px !important;
+            flex: 0 0 auto !important;
             width: 260px !important;
             min-width: 260px !important;
+            max-width: 420px !important;
             box-sizing: border-box !important;
             background: var(--side) !important;
             border-right: 1px solid var(--line) !important;
             padding: 24px 22px !important;
+            resize: horizontal !important;
+            overflow: auto !important;
+            position: relative !important;
         }
         [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(2) {
             flex: 1 1 auto !important;
@@ -123,14 +127,37 @@ def inject_styles() -> None:
             box-sizing: border-box !important;
             background: var(--pane) !important;
             border-right: 1px solid var(--line) !important;
+            resize: horizontal !important;
+            overflow: auto !important;
+            position: relative !important;
         }
         [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(3) {
-            flex: 0 0 500px !important;
+            flex: 0 0 auto !important;
             width: 500px !important;
-            min-width: 500px !important;
+            min-width: 390px !important;
+            max-width: 680px !important;
             box-sizing: border-box !important;
             background: var(--right) !important;
             padding: 18px 20px !important;
+            resize: horizontal !important;
+            overflow: auto !important;
+            position: relative !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(1)::after,
+        [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(2)::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: -3px;
+            width: 6px;
+            height: 100%;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 20;
+        }
+        [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(1):hover::after,
+        [data-testid="stHorizontalBlock"]:has(.layout-anchor) > [data-testid="stColumn"]:nth-child(2):hover::after {
+            background: rgba(37, 99, 235, .10);
         }
         * {
             letter-spacing: 0 !important;
@@ -208,8 +235,8 @@ def inject_styles() -> None:
         }
         .calendar-title {
             margin: 0;
-            font-size: 1.35rem;
-            font-weight: 900;
+            font-size: 1.22rem;
+            font-weight: 760;
         }
         .calendar-subtitle {
             margin: 6px 0 0;
@@ -238,7 +265,8 @@ def inject_styles() -> None:
         .month-head {
             background: #f2f5fb;
             color: var(--muted);
-            font-weight: 900;
+            font-size: .82rem;
+            font-weight: 560;
             text-align: center;
             padding: 10px;
             border-right: 1px solid var(--line-soft);
@@ -254,6 +282,7 @@ def inject_styles() -> None:
             color: var(--text) !important;
             text-decoration: none !important;
             overflow: hidden;
+            font-size: .86rem;
         }
         .day-link:hover, .day-link.selected {
             background: #eef5ff;
@@ -267,7 +296,8 @@ def inject_styles() -> None:
         }
         .day-number-text {
             display: block;
-            font-weight: 900;
+            font-size: .82rem;
+            font-weight: 520;
             margin-bottom: 6px;
         }
         .event-pill {
@@ -277,7 +307,8 @@ def inject_styles() -> None:
             border-radius: 6px;
             background: var(--primary-soft);
             color: var(--primary);
-            font-size: .72rem;
+            font-size: .66rem;
+            font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -469,6 +500,8 @@ def run_auto_site_collection() -> None:
     if not due:
         return
     result = collect_interest_sites()
+    if result.success:
+        store.delete_candidates_by_sources(REQUESTED_SITE_SOURCES)
     for candidate in result.candidates:
         store.upsert_candidate(candidate)
     st.session_state.last_site_collection_at = datetime.now()
@@ -596,6 +629,8 @@ def render_left(events: list[ScheduleEvent]) -> None:
     st.markdown("<p class='section-label'>Interest Sites</p>", unsafe_allow_html=True)
     if st.button("관심 사이트 지금 수집", use_container_width=True):
         result = collect_interest_sites()
+        if result.success:
+            store.delete_candidates_by_sources(REQUESTED_SITE_SOURCES)
         for candidate in result.candidates:
             store.upsert_candidate(candidate)
         st.session_state.last_site_collection_at = datetime.now()
@@ -868,7 +903,7 @@ def render_google_tools() -> None:
 
 def render_candidates() -> None:
     st.markdown("### 관심 사이트 수집 후보")
-    candidates = store.list_candidates()
+    candidates = [candidate for candidate in store.list_candidates() if candidate.source in REQUESTED_SITE_SOURCES]
     if not candidates:
         st.caption("수집된 모집중 공고가 없습니다. 좌측에서 관심 사이트 수집을 실행하세요.")
         return

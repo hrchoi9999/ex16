@@ -279,6 +279,13 @@ class ScheduleStore:
             rows = connection.execute(query, params).fetchall()
         return [self._row_to_candidate(row) for row in rows]
 
+    def delete_candidates_by_sources(self, sources: tuple[str, ...]) -> None:
+        if not sources:
+            return
+        placeholders = ",".join("?" for _ in sources)
+        with self._connect() as connection:
+            connection.execute(f"DELETE FROM external_candidates WHERE source IN ({placeholders})", sources)
+
     def mark_candidate_selected(self, candidate_id: int) -> None:
         with self._connect() as connection:
             connection.execute("UPDATE external_candidates SET selected = 1 WHERE id = ?", (candidate_id,))
