@@ -571,11 +571,28 @@ def run_auto_site_collection() -> None:
 
 def import_google_events_for_current_period() -> None:
     start_at, end_at = period_bounds(st.session_state.selected_date, st.session_state.view_mode)
+    import_google_events_for_range(start_at, end_at, "현재 보기 범위")
+
+
+def import_google_events_for_wide_period() -> None:
+    selected = st.session_state.selected_date
+    start_at = datetime(selected.year - 1, 1, 1)
+    end_at = datetime(selected.year + 2, 1, 1)
+    import_google_events_for_range(start_at, end_at, f"{selected.year - 1}~{selected.year + 1}년")
+
+
+def import_google_events_for_range(start_at: datetime, end_at: datetime, label: str) -> None:
     result = calendar_client.list_events(start_at, end_at)
     if result.success:
         for event in result.events:
             store.upsert_google_event(event)
-    st.session_state.sync_message = result.message
+        st.session_state.sync_message = (
+            f"{label}({start_at:%Y-%m-%d}~{end_at:%Y-%m-%d})에서 "
+            f"{len(result.events)}개 일정을 가져와 저장/갱신했습니다. "
+            "가져온 일정이 현재 달에 없으면 좌우 꺾쇠로 해당 월로 이동하세요."
+        )
+    else:
+        st.session_state.sync_message = f"{label}({start_at:%Y-%m-%d}~{end_at:%Y-%m-%d}) 조회 실패: {result.message}"
 
 
 def create_event(event: ScheduleEvent) -> ScheduleEvent:
@@ -1097,6 +1114,10 @@ def render_google_tools() -> None:
     if st.button("현재 보기 범위 가져오기", use_container_width=True):
         import_google_events_for_current_period()
         st.rerun()
+    if st.button("선택 연도 ±1년 가져오기", use_container_width=True):
+        import_google_events_for_wide_period()
+        st.rerun()
+    st.caption("현재 보기 범위에 일정이 없더라도 다른 달/연도에 있는 Google 일정은 넓은 범위 가져오기로 추가할 수 있습니다.")
     if st.session_state.sync_message:
         st.info(st.session_state.sync_message)
 
