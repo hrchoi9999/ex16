@@ -1093,7 +1093,7 @@ def render_google_admin_setup() -> None:
                 "GOOGLE_CALENDAR_ID=primary",
                 "GOOGLE_OAUTH_CLIENT_ID=발급받은_CLIENT_ID",
                 "GOOGLE_OAUTH_CLIENT_SECRET=발급받은_CLIENT_SECRET",
-                "GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8501/",
+                "GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8501",
                 "GOOGLE_OAUTH_TOKEN_FILE=data/google_token.json",
             ]
         ),

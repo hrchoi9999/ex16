@@ -30,7 +30,7 @@
 4. 테스트 단계라면 테스트 사용자에 사용할 Gmail 계정을 등록한다.
 5. Credentials에서 OAuth Client ID를 생성한다.
 6. Application type은 Web application으로 선택한다.
-7. Authorized redirect URI에 로컬 개발 기준 `http://localhost:8501/`를 등록한다.
+7. Authorized redirect URI에 로컬 개발 기준 `http://localhost:8501`를 등록한다.
 8. 발급된 Client ID와 Client Secret을 `.env`에 저장한다.
 9. 앱을 재시작한다.
 
@@ -40,7 +40,7 @@
 GOOGLE_CALENDAR_ID=primary
 GOOGLE_OAUTH_CLIENT_ID=발급받은_CLIENT_ID
 GOOGLE_OAUTH_CLIENT_SECRET=발급받은_CLIENT_SECRET
-GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8501/
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8501
 GOOGLE_OAUTH_TOKEN_FILE=data/google_token.json
 ```
 

@@ -25,7 +25,7 @@ class Settings:
     google_oauth_client_secret_file: str = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET_FILE", "")
     google_oauth_client_id: str = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
     google_oauth_client_secret: str = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
-    google_oauth_redirect_uri: str = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8501/")
+    google_oauth_redirect_uri: str = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8501")
     google_oauth_token_file: str = os.getenv("GOOGLE_OAUTH_TOKEN_FILE", "data/google_token.json")
     google_registered_email: str = os.getenv("GOOGLE_REGISTERED_EMAIL", "")
 

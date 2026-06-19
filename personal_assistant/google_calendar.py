@@ -51,6 +51,13 @@ class GoogleCalendarClient:
         self.enabled = settings.google_calendar_enabled
 
     @staticmethod
+    def _redirect_uri() -> str:
+        uri = settings.google_oauth_redirect_uri.strip()
+        if uri in {"http://localhost:8501/", "http://127.0.0.1:8501/"}:
+            return uri[:-1]
+        return uri
+
+    @staticmethod
     def _token_path() -> Path:
         configured = Path(settings.google_oauth_token_file)
         name = configured.name.lower()
@@ -103,17 +110,18 @@ class GoogleCalendarClient:
                 CALENDAR_SCOPES,
             )
         else:
+            redirect_uri = GoogleCalendarClient._redirect_uri()
             client_config = {
                 "web": {
                     "client_id": settings.google_oauth_client_id,
                     "client_secret": settings.google_oauth_client_secret,
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [settings.google_oauth_redirect_uri],
+                    "redirect_uris": [redirect_uri],
                 }
             }
             flow = flow_class.from_client_config(client_config, CALENDAR_SCOPES)
-        flow.redirect_uri = settings.google_oauth_redirect_uri
+        flow.redirect_uri = GoogleCalendarClient._redirect_uri()
         return flow
 
     def start_oauth(self, login_hint: str = "") -> GoogleOAuthStartResult:
