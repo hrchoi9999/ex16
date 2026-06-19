@@ -1051,6 +1051,7 @@ def render_google_tools() -> None:
             "Gmail 로그인 연동은 가능합니다. 다만 현재 앱에 Google OAuth 클라이언트 설정이 없어 로그인 URL을 만들 수 없습니다. "
             "운영자가 Google Cloud에서 Calendar API를 켜고 OAuth 클라이언트 ID/Secret 및 redirect URI를 설정해야 합니다."
         )
+        render_google_admin_setup()
     else:
         if st.button("Google 로그인 URL 생성", use_container_width=True):
             result = calendar_client.start_oauth(settings.google_registered_email)
@@ -1066,6 +1067,41 @@ def render_google_tools() -> None:
         st.rerun()
     if st.session_state.sync_message:
         st.info(st.session_state.sync_message)
+
+
+def render_google_admin_setup() -> None:
+    st.markdown("#### 관리자 설정 순서")
+    st.markdown(
+        """
+1. Google Cloud Console에서 새 프로젝트를 만들거나 기존 프로젝트를 선택합니다.
+2. API Library에서 **Google Calendar API**를 검색해 활성화합니다.
+3. OAuth consent screen에서 앱 이름, 관리자 이메일, 테스트 사용자 Gmail을 등록합니다.
+4. Credentials에서 **OAuth Client ID**를 만들고 유형은 **Web application**으로 선택합니다.
+5. Authorized redirect URI에 `http://localhost:8501/`를 추가합니다.
+6. 발급된 Client ID와 Client Secret을 `C:\\AI_Agent\\ex16\\.env`에 저장합니다.
+7. Streamlit 앱을 재시작한 뒤 `Google 로그인 열기`를 다시 누릅니다.
+        """
+    )
+    st.code(
+        "\n".join(
+            [
+                "GOOGLE_CALENDAR_ID=primary",
+                "GOOGLE_OAUTH_CLIENT_ID=발급받은_CLIENT_ID",
+                "GOOGLE_OAUTH_CLIENT_SECRET=발급받은_CLIENT_SECRET",
+                "GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8501/",
+                "GOOGLE_OAUTH_TOKEN_FILE=data/google_token.json",
+            ]
+        ),
+        language="dotenv",
+    )
+    st.markdown("#### 사용자 처리")
+    st.markdown(
+        """
+- 사용자는 키를 입력하지 않습니다.
+- 사용자는 앱의 `Google 로그인 열기` 버튼을 누르고 Gmail로 로그인합니다.
+- Google Calendar 권한 동의 후 앱으로 돌아오면 현재 보기 범위의 일정을 가져옵니다.
+        """
+    )
 
 
 def render_candidates() -> None:

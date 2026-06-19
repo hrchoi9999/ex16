@@ -60,3 +60,5 @@ Google Calendar 연동 방식:
 - redirect URI: 로컬 개발 기본값은 `http://localhost:8501/`이며, Google Cloud OAuth 클라이언트의 승인된 리디렉션 URI와 정확히 같아야 한다.
 - 사용자 화면: 앱에서 `Google 로그인 열기`를 눌러 Google 로그인 URL을 생성하고, Google 로그인/Calendar 권한 동의를 진행한다.
 - 서비스 계정 방식은 개인 캘린더 로그인 UX가 아니라 공유 캘린더/서버 간 연동용으로만 사용한다.
+
+관리자/사용자 역할과 최초 실행, 회원 가입, 회원 로그인 프로세스는 `agents/integration_agent/GOOGLE_OAUTH_PROCESS.md`에서 관리한다.
