@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import calendar
 import re
+import urllib.parse
 from datetime import date, datetime, time, timedelta
 from html import escape
 
@@ -35,6 +36,21 @@ parser = CommandParser()
 calendar_client = GoogleCalendarClient()
 
 
+def reset_google_auth_session() -> None:
+    st.session_state.google_auth_url = ""
+    st.session_state.google_auth_state = ""
+    st.session_state.google_code_verifier = ""
+
+
+def google_auth_url_is_stale(auth_url: str) -> bool:
+    if not auth_url:
+        return False
+    redirect_uris = urllib.parse.parse_qs(urllib.parse.urlparse(auth_url).query).get("redirect_uri", [])
+    if not redirect_uris:
+        return True
+    return redirect_uris[0] != calendar_client._redirect_uri()
+
+
 def init_state() -> None:
     today = date.today()
     st.session_state.setdefault("selected_date", today)
@@ -49,6 +65,8 @@ def init_state() -> None:
     st.session_state.setdefault("google_auth_url", "")
     st.session_state.setdefault("google_auth_state", "")
     st.session_state.setdefault("google_code_verifier", "")
+    if google_auth_url_is_stale(st.session_state.google_auth_url):
+        reset_google_auth_session()
 
     query_view = st.query_params.get("view")
     query_date = st.query_params.get("date")
@@ -84,14 +102,10 @@ def handle_google_oauth_callback() -> None:
     )
     if result.success:
         store.register_user(email=result.email or "google-user", display_name=result.display_name)
-        st.session_state.google_auth_url = ""
-        st.session_state.google_auth_state = ""
-        st.session_state.google_code_verifier = ""
+        reset_google_auth_session()
         import_google_events_for_current_period()
     else:
-        st.session_state.google_auth_url = ""
-        st.session_state.google_auth_state = ""
-        st.session_state.google_code_verifier = ""
+        reset_google_auth_session()
     st.session_state.sync_message = result.message
     st.session_state.right_menu = "Google 연동"
     st.query_params.clear()
