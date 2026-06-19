@@ -273,14 +273,30 @@ class GoogleCalendarClient:
             return parsed
         return datetime.now()
 
+    @staticmethod
+    def _google_event_key(calendar_id: str, event_id: str, is_primary: bool = False) -> str:
+        if is_primary:
+            return event_id
+        if calendar_id in {"", settings.google_calendar_id, "primary"}:
+            return event_id
+        return f"{calendar_id}::{event_id}"
+
+    @staticmethod
+    def _split_google_event_key(google_event_id: str) -> tuple[str, str]:
+        if "::" in google_event_id:
+            calendar_id, event_id = google_event_id.split("::", 1)
+            return calendar_id, event_id
+        return settings.google_calendar_id, google_event_id
+
     @classmethod
-    def _event_from_google(cls, item: dict[str, object]) -> ScheduleEvent:
+    def _event_from_google(cls, item: dict[str, object], calendar_id: str = "", is_primary: bool = False) -> ScheduleEvent:
         start_value = item.get("start") if isinstance(item.get("start"), dict) else {}
         end_value = item.get("end") if isinstance(item.get("end"), dict) else {}
         start_at = cls._parse_google_datetime(start_value)  # type: ignore[arg-type]
         end_at = cls._parse_google_datetime(end_value, fallback_end=True)  # type: ignore[arg-type]
         if end_at <= start_at:
             end_at = start_at + timedelta(hours=1)
+        event_id = str(item.get("id") or "")
         return ScheduleEvent(
             id=None,
             title=str(item.get("summary") or "(제목 없음)"),
@@ -289,10 +305,34 @@ class GoogleCalendarClient:
             description=str(item.get("description") or ""),
             location=str(item.get("location") or ""),
             importance=3,
-            google_event_id=str(item.get("id") or ""),
+            google_event_id=cls._google_event_key(calendar_id, event_id, is_primary),
             source="google_calendar",
             sync_status="synced",
         )
+
+    @staticmethod
+    def _calendar_entries(service) -> list[dict[str, object]]:
+        try:
+            response = service.calendarList().list(showHidden=False).execute()
+        except Exception:
+            return [{"id": settings.google_calendar_id, "summary": settings.google_calendar_id, "primary": True, "selected": True}]
+
+        entries: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for item in response.get("items", []):
+            calendar_id = str(item.get("id") or "")
+            if not calendar_id or calendar_id in seen:
+                continue
+            if item.get("deleted") or item.get("hidden"):
+                continue
+            if item.get("selected") is False and not item.get("primary"):
+                continue
+            entries.append(item)
+            seen.add(calendar_id)
+
+        if settings.google_calendar_id and settings.google_calendar_id not in seen:
+            entries.insert(0, {"id": settings.google_calendar_id, "summary": settings.google_calendar_id, "primary": True, "selected": True})
+        return entries
 
     def register_account(self) -> GoogleAccountResult:
         if not self.enabled:
@@ -361,9 +401,10 @@ class GoogleCalendarClient:
                 return created
             return GoogleCalendarSyncResult(True, False, "Google Calendar event id가 없어 로컬만 변경했습니다.")
         try:
+            calendar_id, event_id = self._split_google_event_key(event.google_event_id)
             self._service().events().update(
-                calendarId=settings.google_calendar_id,
-                eventId=event.google_event_id,
+                calendarId=calendar_id,
+                eventId=event_id,
                 body=self._google_body(event),
             ).execute()
             return GoogleCalendarSyncResult(
@@ -386,9 +427,10 @@ class GoogleCalendarClient:
         if not event.google_event_id:
             return GoogleCalendarSyncResult(True, False, "Google Calendar event id가 없어 로컬만 삭제했습니다.")
         try:
+            calendar_id, event_id = self._split_google_event_key(event.google_event_id)
             self._service().events().delete(
-                calendarId=settings.google_calendar_id,
-                eventId=event.google_event_id,
+                calendarId=calendar_id,
+                eventId=event_id,
             ).execute()
             return GoogleCalendarSyncResult(
                 enabled=True,
@@ -413,23 +455,39 @@ class GoogleCalendarClient:
                 events=[],
             )
         try:
-            response = (
-                self._service()
-                .events()
-                .list(
-                    calendarId=settings.google_calendar_id,
-                    timeMin=start_at.replace(tzinfo=ZoneInfo(settings.app_timezone)).isoformat(),
-                    timeMax=end_at.replace(tzinfo=ZoneInfo(settings.app_timezone)).isoformat(),
-                    singleEvents=True,
-                    orderBy="startTime",
-                )
-                .execute()
-            )
-            events = [self._event_from_google(item) for item in response.get("items", [])]
+            service = self._service()
+            events: list[ScheduleEvent] = []
+            checked_count = 0
+            skipped: list[str] = []
+            for calendar_entry in self._calendar_entries(service):
+                calendar_id = str(calendar_entry.get("id") or settings.google_calendar_id)
+                calendar_name = str(calendar_entry.get("summary") or calendar_id)
+                is_primary = bool(calendar_entry.get("primary"))
+                try:
+                    response = (
+                        service.events()
+                        .list(
+                            calendarId=calendar_id,
+                            timeMin=start_at.replace(tzinfo=ZoneInfo(settings.app_timezone)).isoformat(),
+                            timeMax=end_at.replace(tzinfo=ZoneInfo(settings.app_timezone)).isoformat(),
+                            singleEvents=True,
+                            orderBy="startTime",
+                        )
+                        .execute()
+                    )
+                except Exception as exc:
+                    skipped.append(f"{calendar_name}: {exc}")
+                    continue
+                checked_count += 1
+                events.extend(self._event_from_google(item, calendar_id, is_primary) for item in response.get("items", []))
+            events.sort(key=lambda event: event.start_at)
+            detail = f"{checked_count}개 캘린더에서 {len(events)}개 일정을 가져왔습니다."
+            if skipped:
+                detail += f" 일부 캘린더는 건너뜀: {' / '.join(skipped[:3])}"
             return GoogleCalendarImportResult(
                 enabled=True,
                 success=True,
-                message=f"Google Calendar에서 {len(events)}개 일정을 가져왔습니다.",
+                message=f"Google Calendar {detail}",
                 events=events,
             )
         except Exception as exc:

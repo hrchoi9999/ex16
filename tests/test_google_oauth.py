@@ -34,3 +34,12 @@ def test_oauth_start_persists_code_verifier(tmp_path, monkeypatch) -> None:
     assert "code_challenge=" in result.authorization_url
     assert GoogleCalendarClient._pop_oauth_code_verifier(result.state) == result.code_verifier
     assert GoogleCalendarClient._pop_oauth_code_verifier(result.state) == ""
+
+
+def test_google_event_key_keeps_primary_id_and_namespaces_shared_calendar(monkeypatch) -> None:
+    monkeypatch.setattr(google_calendar, "settings", SimpleNamespace(google_calendar_id="primary"))
+
+    assert GoogleCalendarClient._google_event_key("hrchoi9999@gmail.com", "event-1", is_primary=True) == "event-1"
+    assert GoogleCalendarClient._google_event_key("shared-calendar", "event-1") == "shared-calendar::event-1"
+    assert GoogleCalendarClient._split_google_event_key("shared-calendar::event-1") == ("shared-calendar", "event-1")
+    assert GoogleCalendarClient._split_google_event_key("event-1") == ("primary", "event-1")
