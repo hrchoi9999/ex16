@@ -51,6 +51,12 @@ def google_auth_url_is_stale(auth_url: str) -> bool:
     return redirect_uris[0] != calendar_client._redirect_uri()
 
 
+def remember_google_auth_start(result) -> None:
+    st.session_state.google_auth_url = result.authorization_url
+    st.session_state.google_auth_state = result.state
+    st.session_state.google_code_verifier = getattr(result, "code_verifier", "")
+
+
 def init_state() -> None:
     today = date.today()
     st.session_state.setdefault("selected_date", today)
@@ -674,15 +680,11 @@ def render_left(events: list[ScheduleEvent]) -> None:
     if calendar_client.enabled and not st.session_state.google_auth_url:
         result = calendar_client.start_oauth(login_hint=google_email.strip())
         if result.success:
-            st.session_state.google_auth_url = result.authorization_url
-            st.session_state.google_auth_state = result.state
-            st.session_state.google_code_verifier = result.code_verifier
+            remember_google_auth_start(result)
     if st.button("Google 로그인 링크 새로 만들기", use_container_width=True):
         result = calendar_client.start_oauth(login_hint=google_email.strip())
         if result.success:
-            st.session_state.google_auth_url = result.authorization_url
-            st.session_state.google_auth_state = result.state
-            st.session_state.google_code_verifier = result.code_verifier
+            remember_google_auth_start(result)
         st.session_state.sync_message = result.message
         st.session_state.right_menu = "Google 연동"
         st.rerun()
@@ -1087,9 +1089,7 @@ def render_google_tools() -> None:
         if st.button("Google 로그인 URL 생성", use_container_width=True):
             result = calendar_client.start_oauth(settings.google_registered_email)
             if result.success:
-                st.session_state.google_auth_url = result.authorization_url
-                st.session_state.google_auth_state = result.state
-                st.session_state.google_code_verifier = result.code_verifier
+                remember_google_auth_start(result)
             st.session_state.sync_message = result.message
             st.rerun()
         if st.session_state.google_auth_url:
