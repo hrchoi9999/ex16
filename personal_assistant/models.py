@@ -14,6 +14,9 @@ class ScheduleEvent:
     location: str = ""
     importance: int = 3
     google_event_id: str | None = None
+    source: str = "local"
+    source_url: str = ""
+    sync_status: str = "local"
 
     @property
     def date_label(self) -> str:
@@ -29,3 +32,25 @@ class ScheduleEvent:
             return f"{meridiem} {display_hour}시 {minute}분"
         return f"{meridiem} {display_hour}시"
 
+
+@dataclass
+class AppUser:
+    id: int | None
+    email: str
+    display_name: str = ""
+    provider: str = "google"
+    linked_at: str = ""
+    auto_sync: bool = True
+
+
+@dataclass
+class ExternalScheduleCandidate:
+    id: int | None
+    source: str
+    category: str
+    title: str
+    recruitment_period: str
+    url: str
+    status: str = "모집중"
+    collected_at: str = ""
+    selected: bool = False

@@ -10,6 +10,9 @@
 - LLM 응답 schema 검증 기준 작성
 - 모호한 날짜/시간 확인 질문 정책 정리
 - Gemini/OpenAI provider interface 유지
+- Gemini API key 기반 우측 AI 채팅 구현
+- 일정 질의 결과와 matching event id 반환
+- 캘린더의 해당 일정 깜빡임 강조 상태 연동
 
 ## QA 기준
 

@@ -33,7 +33,7 @@ class CommandParser:
         cleaned = text.strip()
         intent = self._detect_intent(cleaned)
         if intent != "create":
-            return ParsedCommand(intent=intent, event=None, message="조회 또는 변경 명령은 화면의 일정 목록에서 처리해 주세요.")
+            return ParsedCommand(intent=intent, event=None, message="조회/변경 명령은 화면의 일정 목록에서 처리하세요.")
 
         llm_event = self._parse_with_llm(cleaned, today)
         if llm_event:
@@ -43,19 +43,18 @@ class CommandParser:
         start_time = self._parse_time(cleaned)
         title = self._parse_title(cleaned)
         start_at = datetime.combine(start_day, start_time)
-        end_at = start_at + timedelta(hours=1)
         event = ScheduleEvent(
             id=None,
             title=title,
             start_at=start_at,
-            end_at=end_at,
+            end_at=start_at + timedelta(hours=1),
             importance=self._parse_importance(cleaned),
             description=cleaned,
         )
         return ParsedCommand(intent="create", event=event, message="규칙 기반 파서로 일정을 해석했습니다.")
 
     def _detect_intent(self, text: str) -> str:
-        if any(keyword in text for keyword in ["등록", "추가", "잡아", "만들"]):
+        if any(keyword in text for keyword in ["등록", "추가", "넣어", "만들"]):
             return "create"
         if any(keyword in text for keyword in ["조회", "보여", "확인", "알려"]):
             return "list"
@@ -82,7 +81,7 @@ class CommandParser:
                 days_ahead = 7
             return today + timedelta(days=days_ahead)
 
-        iso_match = re.search(r"(20\d{2})[-./년 ]\s*(\d{1,2})[-./월 ]\s*(\d{1,2})", text)
+        iso_match = re.search(r"(20\d{2})[-./년]\s*(\d{1,2})[-./월]\s*(\d{1,2})", text)
         if iso_match:
             year, month, day = map(int, iso_match.groups())
             return date(year, month, day)
@@ -117,21 +116,22 @@ class CommandParser:
             r"이번\s*주\s*[월화수목금토일]요일",
             r"[월화수목금토일]요일",
             r"오늘|내일|모레",
-            r"(20\d{2})[-./년 ]\s*(\d{1,2})[-./월 ]\s*(\d{1,2})",
+            r"(20\d{2})[-./년]\s*(\d{1,2})[-./월]\s*(\d{1,2})일?",
             r"\d{1,2}월\s*\d{1,2}일",
-            r"(오전|오후)?\s*\d{1,2}시(?:\s*\d{1,2}분|반)?(?:에)?",
-            r"중요한?|긴급한?|필수",
-            r"등록해줘|등록|추가해줘|추가|잡아줘|잡아|만들어줘|만들어",
+            r"(오전|오후)?\s*\d{1,2}시(?:\s*\d{1,2}분|반)?",
+            r"중요한|긴급한|필수",
+            r"등록해줘|등록|추가해줘|추가|넣어줘|넣어|만들어줘|만들어",
         ]
         for pattern in patterns:
             title = re.sub(pattern, " ", title)
-        title = re.sub(r"\s+", " ", title).strip(" .요")
+        title = re.sub(r"\b[에은는이가을를]\b", " ", title)
+        title = re.sub(r"\s+", " ", title).strip(" .,요에")
         return title or "새 일정"
 
     def _parse_importance(self, text: str) -> int:
         if any(keyword in text for keyword in ["중요", "긴급", "필수"]):
             return 5
-        if any(keyword in text for keyword in ["가볍", "참고"]):
+        if any(keyword in text for keyword in ["가벼운", "참고"]):
             return 2
         return 3
 

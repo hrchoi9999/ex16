@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .config import settings
 from .models import ScheduleEvent
+
+
+CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 @dataclass
@@ -24,19 +28,66 @@ class GoogleCalendarImportResult:
     events: list[ScheduleEvent]
 
 
+@dataclass
+class GoogleAccountResult:
+    enabled: bool
+    success: bool
+    message: str
+    email: str = ""
+    display_name: str = ""
+
+
 class GoogleCalendarClient:
     def __init__(self) -> None:
         self.enabled = settings.google_calendar_enabled
 
     def _service(self):
-        from google.oauth2 import service_account
         from googleapiclient.discovery import build
+
+        if settings.google_oauth_client_secret_file:
+            credentials = self._oauth_credentials()
+            return build("calendar", "v3", credentials=credentials)
+
+        from google.oauth2 import service_account
 
         credentials = service_account.Credentials.from_service_account_file(
             settings.google_service_account_file,
-            scopes=["https://www.googleapis.com/auth/calendar"],
+            scopes=CALENDAR_SCOPES,
         )
         return build("calendar", "v3", credentials=credentials)
+
+    def _oauth_credentials(self):
+        token_path = Path(settings.google_oauth_token_file)
+        credentials = None
+        if token_path.exists():
+            from google.oauth2.credentials import Credentials
+
+            credentials = Credentials.from_authorized_user_file(str(token_path), CALENDAR_SCOPES)
+
+        if credentials and credentials.valid:
+            return credentials
+
+        if credentials and credentials.expired and credentials.refresh_token:
+            from google.auth.transport.requests import Request
+
+            credentials.refresh(Request())
+        else:
+            try:
+                from google_auth_oauthlib.flow import InstalledAppFlow
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Google OAuth를 사용하려면 google-auth-oauthlib 패키지가 필요합니다."
+                ) from exc
+
+            flow = InstalledAppFlow.from_client_secrets_file(
+                settings.google_oauth_client_secret_file,
+                CALENDAR_SCOPES,
+            )
+            credentials = flow.run_local_server(port=0)
+
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text(credentials.to_json(), encoding="utf-8")
+        return credentials
 
     @staticmethod
     def _google_body(event: ScheduleEvent) -> dict[str, object]:
@@ -52,7 +103,7 @@ class GoogleCalendarClient:
     def _parse_google_datetime(value: dict[str, str], fallback_end: bool = False) -> datetime:
         if "dateTime" in value:
             raw = value["dateTime"].replace("Z", "+00:00")
-            return datetime.fromisoformat(raw).replace(tzinfo=None)
+            return datetime.fromisoformat(raw).astimezone(ZoneInfo(settings.app_timezone)).replace(tzinfo=None)
         if "date" in value:
             parsed = datetime.combine(date.fromisoformat(value["date"]), time.min)
             if fallback_end:
@@ -77,6 +128,46 @@ class GoogleCalendarClient:
             location=str(item.get("location") or ""),
             importance=3,
             google_event_id=str(item.get("id") or ""),
+            source="google_calendar",
+            sync_status="synced",
+        )
+
+    def register_account(self) -> GoogleAccountResult:
+        if not self.enabled:
+            return GoogleAccountResult(
+                enabled=False,
+                success=False,
+                message="Google Calendar 설정이 없습니다. .env에 GOOGLE_OAUTH_CLIENT_SECRET_FILE 또는 GOOGLE_SERVICE_ACCOUNT_FILE을 설정하세요.",
+            )
+
+        if settings.google_registered_email:
+            return GoogleAccountResult(
+                enabled=True,
+                success=True,
+                message="환경 변수에 등록된 Google 계정을 사용합니다.",
+                email=settings.google_registered_email,
+                display_name=settings.google_registered_email.split("@")[0],
+            )
+
+        if settings.google_oauth_client_secret_file:
+            try:
+                self._oauth_credentials()
+                return GoogleAccountResult(
+                    enabled=True,
+                    success=True,
+                    message="Google OAuth 인증이 완료되었습니다. 이메일은 GOOGLE_REGISTERED_EMAIL로 지정하면 표시됩니다.",
+                    email="google-user",
+                    display_name="Google User",
+                )
+            except Exception as exc:
+                return GoogleAccountResult(True, False, f"Google OAuth 인증에 실패했습니다. {exc}")
+
+        return GoogleAccountResult(
+            enabled=True,
+            success=True,
+            message="서비스 계정 방식으로 Google Calendar 연동이 활성화되었습니다.",
+            email="service-account",
+            display_name="Google Service Account",
         )
 
     def create_event(self, event: ScheduleEvent) -> GoogleCalendarSyncResult:
@@ -106,7 +197,10 @@ class GoogleCalendarClient:
         if not self.enabled:
             return GoogleCalendarSyncResult(False, False, "Google Calendar 설정이 없어 로컬만 변경했습니다.")
         if not event.google_event_id:
-            return GoogleCalendarSyncResult(True, False, "Google Calendar 이벤트 ID가 없어 로컬만 변경했습니다.")
+            created = self.create_event(event)
+            if created.google_event_id:
+                return created
+            return GoogleCalendarSyncResult(True, False, "Google Calendar event id가 없어 로컬만 변경했습니다.")
         try:
             self._service().events().update(
                 calendarId=settings.google_calendar_id,
@@ -131,7 +225,7 @@ class GoogleCalendarClient:
         if not self.enabled:
             return GoogleCalendarSyncResult(False, False, "Google Calendar 설정이 없어 로컬만 삭제했습니다.")
         if not event.google_event_id:
-            return GoogleCalendarSyncResult(True, False, "Google Calendar 이벤트 ID가 없어 로컬만 삭제했습니다.")
+            return GoogleCalendarSyncResult(True, False, "Google Calendar event id가 없어 로컬만 삭제했습니다.")
         try:
             self._service().events().delete(
                 calendarId=settings.google_calendar_id,
@@ -156,7 +250,7 @@ class GoogleCalendarClient:
             return GoogleCalendarImportResult(
                 enabled=False,
                 success=False,
-                message="Google Calendar 설정이 없습니다. .env에 GOOGLE_SERVICE_ACCOUNT_FILE과 GOOGLE_CALENDAR_ID를 설정해 주세요.",
+                message="Google Calendar 설정이 없습니다. .env에 Google Calendar 인증 정보를 설정하세요.",
                 events=[],
             )
         try:

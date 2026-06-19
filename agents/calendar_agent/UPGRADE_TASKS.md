@@ -6,9 +6,11 @@
 
 ## 준비 작업
 
-- 신규 기능이 일정 schema에 미치는 영향 분석
-- 반복 일정, 외부 일정 후보, sync status, source metadata 확장 검토
-- 일/주/월 view query 영향 검토
+- 일정 schema에 source/source_url/sync metadata 확장
+- 일 view 시간 단위 등록/수정/삭제 구현
+- 주/월 날짜 선택 후 해당 날짜 편집 흐름 구현
+- Google Calendar 등록/변경/삭제 동기화 유지
+- 외부 수집 후보를 선택 시 일정으로 등록하는 흐름 구현
 
 ## QA 기준
 

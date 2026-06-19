@@ -22,4 +22,3 @@ def test_parse_important_tomorrow_event() -> None:
     assert parsed.event.title == "면접"
     assert parsed.event.importance == 5
     assert parsed.event.start_at.date().isoformat() == "2026-06-19"
-
