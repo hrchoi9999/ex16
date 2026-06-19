@@ -31,7 +31,7 @@
 5. Credentials에서 OAuth Client ID를 생성한다.
 6. Application type은 Web application으로 선택한다.
 7. Authorized redirect URI에 로컬 개발 기준 `http://localhost:8501`를 등록한다.
-8. 발급된 Client ID와 Client Secret을 `.env`에 저장한다.
+8. 발급된 Client ID와 Client Secret을 `C:\AI_Agent\.chatgptkey.env`에 저장한다.
 9. 앱을 재시작한다.
 
 `.env` 예시:
@@ -54,6 +54,36 @@ GOOGLE_OAUTH_TOKEN_FILE=data/google_token.json
 4. 앱으로 돌아온 뒤 가져온 일정을 확인한다.
 
 사용자는 OAuth Client ID, Client Secret, token file을 직접 입력하지 않는다.
+
+## `Google에서 확인하지 않은 앱` 경고 처리
+
+이 경고는 redirect URI 문제를 통과한 뒤 OAuth 앱이 아직 Google 검증을 받지 않았을 때 표시된다.
+
+관리자 처리:
+
+- Google Cloud Console의 OAuth consent screen에서 앱 게시 상태가 Testing인지 Production인지 확인한다.
+- Testing 상태라면 Audience 또는 Test users 메뉴에 사용할 Gmail 계정을 등록한다.
+- Authorized redirect URI는 앱이 생성하는 값과 동일하게 `http://localhost:8501`로 유지한다.
+- 실제 외부 사용자에게 배포하려면 앱 이름, 지원 이메일, 승인 도메인, 개인정보처리방침, 필요한 Calendar scope를 정리해 Google 검증을 요청한다.
+
+사용자 처리:
+
+- 테스트 사용자로 등록된 Gmail 계정으로 로그인한다.
+- 경고 화면에서 `고급`을 클릭한다.
+- `AI Scheduler(으)로 이동` 또는 `안전하지 않음` 표시가 붙은 계속 진행 링크를 클릭한다.
+- Calendar 권한 동의 화면에서 요청 범위를 확인하고 동의한다.
+
+개발 지시:
+
+- 앱의 Google 연동 패널은 이 경고가 정상적인 개발/테스트 단계의 차단 화면임을 설명해야 한다.
+- 사용자에게 Client ID나 Client Secret을 입력하라고 요구하지 않는다.
+- 테스트 사용자 등록이 누락된 경우에는 관리자가 처리해야 할 항목으로 안내한다.
+
+QA 기준:
+
+- 테스트 사용자 등록 후 `고급`을 통해 OAuth 동의 화면으로 진입할 수 있다.
+- 테스트 사용자가 아닌 Gmail 계정으로 로그인하면 접근 제한 또는 검증 관련 오류가 날 수 있음을 안내한다.
+- Production 배포 전에는 Google 검증이 필요하다는 안내가 남아 있어야 한다.
 
 ## 프로세스 1: 앱 최초 실행
 

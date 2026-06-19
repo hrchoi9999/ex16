@@ -1082,8 +1082,8 @@ def render_google_admin_setup() -> None:
 2. API Library에서 **Google Calendar API**를 검색해 활성화합니다.
 3. OAuth consent screen에서 앱 이름, 관리자 이메일, 테스트 사용자 Gmail을 등록합니다.
 4. Credentials에서 **OAuth Client ID**를 만들고 유형은 **Web application**으로 선택합니다.
-5. Authorized redirect URI에 `http://localhost:8501/`를 추가합니다.
-6. 발급된 Client ID와 Client Secret을 `C:\\AI_Agent\\ex16\\.env`에 저장합니다.
+5. Authorized redirect URI에 `http://localhost:8501`를 추가합니다.
+6. 발급된 Client ID와 Client Secret을 `C:\\AI_Agent\\.chatgptkey.env`에 저장합니다.
 7. Streamlit 앱을 재시작한 뒤 `Google 로그인 열기`를 다시 누릅니다.
         """
     )
@@ -1105,6 +1105,14 @@ def render_google_admin_setup() -> None:
 - 사용자는 키를 입력하지 않습니다.
 - 사용자는 앱의 `Google 로그인 열기` 버튼을 누르고 Gmail로 로그인합니다.
 - Google Calendar 권한 동의 후 앱으로 돌아오면 현재 보기 범위의 일정을 가져옵니다.
+        """
+    )
+    st.markdown("#### `Google에서 확인하지 않은 앱` 화면이 나올 때")
+    st.markdown(
+        """
+- 개발/테스트 중이면 Google Cloud Console의 OAuth consent screen에서 현재 Gmail 계정이 테스트 사용자로 등록되어 있어야 합니다.
+- 테스트 사용자로 등록된 계정이라면 경고 화면에서 `고급`을 누른 뒤 `AI Scheduler(으)로 이동` 또는 `안전하지 않음` 표시가 붙은 계속 진행 링크를 선택합니다.
+- 실제 외부 사용자에게 배포하려면 OAuth 앱 브랜드, 도메인, 개인정보처리방침, Calendar 데이터 접근 범위를 Google 검증 절차에 제출해야 합니다.
         """
     )
 
