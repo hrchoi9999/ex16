@@ -708,10 +708,22 @@ def inject_resizer_component() -> None:
               cols[1].style.setProperty('min-width', '520px', 'important');
               cols[2].style.setProperty('flex', `0 0 ${rightWidth}px`, 'important');
               cols[2].style.setProperty('width', `${rightWidth}px`, 'important');
-              leftHandle.style.left = `${leftWidth}px`;
-              rightHandle.style.right = `${rightWidth}px`;
+              positionHandles();
               storage.setItem('aiScheduler.leftWidth', String(leftWidth));
               storage.setItem('aiScheduler.rightWidth', String(rightWidth));
+            }
+
+            function positionHandles() {
+              const blockRect = block.getBoundingClientRect();
+              const leftRect = cols[1].getBoundingClientRect();
+              const rightRect = cols[2].getBoundingClientRect();
+              leftHandle.style.left = `${leftRect.left - blockRect.left}px`;
+              rightHandle.style.left = `${rightRect.left - blockRect.left}px`;
+              rightHandle.style.right = '';
+            }
+
+            function totalColumnWidth() {
+              return cols.reduce((sum, col) => sum + col.getBoundingClientRect().width, 0);
             }
 
             function drag(handle, side) {
@@ -719,11 +731,12 @@ def inject_resizer_component() -> None:
                 event.preventDefault();
                 handle.classList.add('dragging');
                 const rect = block.getBoundingClientRect();
+                const totalWidth = totalColumnWidth();
                 const move = (moveEvent) => {
                   if (side === 'left') {
                     leftWidth = moveEvent.clientX - rect.left;
                   } else {
-                    rightWidth = rect.right - moveEvent.clientX;
+                    rightWidth = totalWidth - (moveEvent.clientX - rect.left);
                   }
                   apply();
                 };
