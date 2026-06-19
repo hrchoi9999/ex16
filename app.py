@@ -43,6 +43,18 @@ def init_state() -> None:
     st.session_state.setdefault("highlight_event_ids", [])
     st.session_state.setdefault("show_day_dialog", False)
     st.session_state.setdefault("last_site_collection_at", None)
+    query_view = st.query_params.get("view")
+    query_date = st.query_params.get("date")
+    query_dialog = st.query_params.get("dialog")
+    if query_view in VIEW_TITLES:
+        st.session_state.view_mode = query_view
+    if query_date:
+        try:
+            st.session_state.selected_date = date.fromisoformat(query_date)
+        except ValueError:
+            pass
+    if query_dialog == "1":
+        st.session_state.show_day_dialog = True
 
 
 def inject_styles() -> None:
@@ -77,6 +89,43 @@ def inject_styles() -> None:
         .block-container {
             padding: 0 !important;
             max-width: 100% !important;
+            min-width: 1280px !important;
+        }
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"] {
+            overflow-x: auto !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.left-shell) {
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: stretch !important;
+            min-width: 1280px !important;
+            gap: 0 !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.left-shell) > [data-testid="stColumn"]:nth-child(1) {
+            flex: 0 0 260px !important;
+            width: 260px !important;
+            min-width: 260px !important;
+            box-sizing: border-box !important;
+            background: var(--side) !important;
+            border-right: 1px solid var(--line) !important;
+            padding: 24px 22px !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.left-shell) > [data-testid="stColumn"]:nth-child(2) {
+            flex: 0 0 720px !important;
+            width: 720px !important;
+            min-width: 720px !important;
+            box-sizing: border-box !important;
+            background: var(--pane) !important;
+            border-right: 1px solid var(--line) !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.left-shell) > [data-testid="stColumn"]:nth-child(3) {
+            flex: 0 0 340px !important;
+            width: 340px !important;
+            min-width: 340px !important;
+            box-sizing: border-box !important;
+            background: #f3f6fd !important;
+            padding: 22px !important;
         }
         * {
             letter-spacing: 0 !important;
@@ -89,18 +138,13 @@ def inject_styles() -> None:
             background: var(--pane);
         }
         .left-shell {
-            background: var(--side);
-            border-right: 1px solid var(--line);
-            padding: 24px 22px;
+            display: none !important;
         }
         .center-shell {
-            background: var(--pane);
-            border-right: 1px solid var(--line);
-            min-height: 720px;
+            display: none !important;
         }
         .right-shell {
-            background: #f3f6fd;
-            padding: 22px;
+            display: none !important;
         }
         .brand {
             display: flex;
@@ -207,6 +251,35 @@ def inject_styles() -> None:
             border-right: 1px solid var(--line-soft);
             border-bottom: 1px solid var(--line-soft);
         }
+        .day-link {
+            display: block;
+            min-height: 112px;
+            padding: 8px;
+            border-right: 1px solid var(--line-soft);
+            border-bottom: 1px solid var(--line-soft);
+            background: #fff;
+            color: var(--text) !important;
+            text-decoration: none !important;
+            overflow: hidden;
+        }
+        .day-link:hover {
+            background: #eef5ff;
+        }
+        .day-link.outside {
+            background: #f8fafc;
+            opacity: .58;
+        }
+        .day-link.today {
+            box-shadow: inset 0 0 0 2px var(--primary);
+        }
+        .day-link.selected {
+            background: #eef5ff;
+        }
+        .day-number-text {
+            display: block;
+            font-weight: 900;
+            margin-bottom: 6px;
+        }
         .day-box {
             min-height: 112px;
             padding: 8px;
@@ -248,6 +321,40 @@ def inject_styles() -> None:
         .week-grid {
             display: grid;
             grid-template-columns: 58px repeat(7, minmax(0, 1fr));
+        }
+        .calendar-nav {
+            display: grid;
+            grid-template-columns: 46px minmax(0, 1fr) 46px;
+            gap: 12px;
+            align-items: center;
+            padding: 22px 24px 14px;
+        }
+        .nav-square {
+            display: flex;
+            height: 38px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            color: var(--text) !important;
+            text-decoration: none !important;
+            background: #fff;
+            font-size: 1.35rem;
+            font-weight: 900;
+        }
+        .week-head-link {
+            display: block;
+            padding: 10px 8px;
+            text-align: center;
+            color: var(--text) !important;
+            text-decoration: none !important;
+            font-weight: 900;
+            background: #f2f5fb;
+            border-left: 1px solid var(--line-soft);
+            border-bottom: 1px solid var(--line-soft);
+        }
+        .week-head-link:hover {
+            background: #e8f0ff;
         }
         .time-cell {
             height: 54px;
@@ -308,9 +415,8 @@ def inject_styles() -> None:
             justify-content: flex-start;
         }
         @media (max-width: 1100px) {
-            .app-shell {
-                grid-template-columns: 220px minmax(600px, 1fr) 320px;
-                overflow-x: auto;
+            .block-container {
+                min-width: 1280px !important;
             }
         }
         </style>
@@ -508,25 +614,21 @@ def render_center(events: list[ScheduleEvent]) -> None:
         else f"{selected:%Y년 %m월 %d일}"
     )
 
-    prev_col, title_col, next_col = st.columns([0.12, 0.76, 0.12])
-    with prev_col:
-        if st.button("‹", key="calendar_prev", use_container_width=True):
-            shift_current(-1)
-            st.rerun()
-    with title_col:
-        st.markdown(
-            f"""
-            <div class="calendar-header" style="border-bottom:0;padding:0 0 8px;">
-                <h2 class="calendar-title">{title}</h2>
+    previous_date = shifted_date(selected, view_mode, -1)
+    next_date = shifted_date(selected, view_mode, 1)
+    st.markdown(
+        f"""
+        <div class="calendar-nav">
+            <a class="nav-square" href="{calendar_href(previous_date, view_mode)}">‹</a>
+            <div>
+                <h2 class="calendar-title">{escape(title)}</h2>
                 <p class="calendar-subtitle">{VIEW_TITLES[view_mode]} · 일정 {len(visible_events)}개</p>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with next_col:
-        if st.button("›", key="calendar_next", use_container_width=True):
-            shift_current(1)
-            st.rerun()
+            <a class="nav-square" href="{calendar_href(next_date, view_mode)}">›</a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if view_mode == "month":
         render_month(events, selected)
@@ -536,33 +638,28 @@ def render_center(events: list[ScheduleEvent]) -> None:
         render_day(events, selected)
 
 
-def shift_current(direction: int) -> None:
-    selected = st.session_state.selected_date
-    view_mode = st.session_state.view_mode
+def shifted_date(selected: date, view_mode: str, direction: int) -> date:
     if view_mode == "month":
-        st.session_state.selected_date = add_months(selected, direction)
-    elif view_mode == "week":
-        st.session_state.selected_date = selected + timedelta(days=7 * direction)
-    else:
-        st.session_state.selected_date = selected + timedelta(days=direction)
+        return add_months(selected, direction)
+    if view_mode == "week":
+        return selected + timedelta(days=7 * direction)
+    return selected + timedelta(days=direction)
+
+
+def calendar_href(target_date: date, view_mode: str, dialog: bool = False) -> str:
+    suffix = "&dialog=1" if dialog else ""
+    return f"?view={view_mode}&date={target_date.isoformat()}{suffix}"
 
 
 def render_month(events: list[ScheduleEvent], selected: date) -> None:
     month = selected.replace(day=1)
-    st.markdown("<div class='month-grid'>", unsafe_allow_html=True)
-    cols = st.columns(7, gap="small")
-    for index, label in enumerate(WEEKDAY_LABELS):
-        cols[index].markdown(f"<div class='month-head'>{label}</div>", unsafe_allow_html=True)
+    parts = ["<div class='month-grid'>"]
+    for label in WEEKDAY_LABELS:
+        parts.append(f"<div class='month-head'>{label}</div>")
     for week in calendar.Calendar(firstweekday=0).monthdatescalendar(month.year, month.month):
-        cols = st.columns(7, gap="small")
-        for index, day in enumerate(week):
+        for day in week:
             day_events = events_for_day(events, day)
-            label = f"{day.day}"
-            if cols[index].button(label, key=f"month_day_{day.isoformat()}", use_container_width=True):
-                st.session_state.selected_date = day
-                st.session_state.show_day_dialog = True
-                st.rerun()
-            classes = ["day-box"]
+            classes = ["day-link"]
             if day.month != month.month:
                 classes.append("outside")
             if day == date.today():
@@ -570,20 +667,24 @@ def render_month(events: list[ScheduleEvent], selected: date) -> None:
             if day == selected:
                 classes.append("selected")
             pills = "".join(event_pill_html(event) for event in day_events[:4])
-            cols[index].markdown(f"<div class='{' '.join(classes)}'>{pills}</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+            parts.append(
+                f"<a class=\"{' '.join(classes)}\" href=\"{calendar_href(day, 'month', dialog=True)}\">"
+                f"<span class=\"day-number-text\">{day.day}</span>{pills}</a>"
+            )
+    parts.append("</div>")
+    st.html("".join(parts))
 
 
 def render_week(events: list[ScheduleEvent], selected: date) -> None:
     start = week_start(selected)
-    header_cols = st.columns([0.08] + [0.132] * 7)
-    header_cols[0].caption("")
+    head_parts = ["<div class='week-grid'><div class='week-head-link' style='background:#fff;border-left:0;'></div>"]
     for index in range(7):
         day = start + timedelta(days=index)
-        if header_cols[index + 1].button(f"{WEEKDAY_LABELS[index]} {day.day}", key=f"week_day_{day.isoformat()}", use_container_width=True):
-            st.session_state.selected_date = day
-            st.session_state.show_day_dialog = True
-            st.rerun()
+        head_parts.append(
+            f'<a class="week-head-link" href="{calendar_href(day, "week", dialog=True)}">{WEEKDAY_LABELS[index]} {day.day}</a>'
+        )
+    head_parts.append("</div>")
+    st.html("".join(head_parts))
 
     grid_parts = ["<div class='week-grid'><div>"]
     for hour in range(7, 21):
