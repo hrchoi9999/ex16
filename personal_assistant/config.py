@@ -18,6 +18,8 @@ class Settings:
     google_calendar_id: str = os.getenv("GOOGLE_CALENDAR_ID", "primary")
     google_service_account_file: str = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "")
     google_oauth_client_secret_file: str = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET_FILE", "")
+    google_oauth_client_id: str = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+    google_oauth_client_secret: str = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
     google_oauth_token_file: str = os.getenv("GOOGLE_OAUTH_TOKEN_FILE", "data/google_token.json")
     google_registered_email: str = os.getenv("GOOGLE_REGISTERED_EMAIL", "")
 
@@ -38,11 +40,15 @@ class Settings:
 
     @property
     def google_calendar_enabled(self) -> bool:
-        return bool(self.google_service_account_file or self.google_oauth_client_secret_file)
+        return bool(
+            self.google_service_account_file
+            or self.google_oauth_client_secret_file
+            or (self.google_oauth_client_id and self.google_oauth_client_secret)
+        )
 
     @property
     def google_oauth_enabled(self) -> bool:
-        return bool(self.google_oauth_client_secret_file)
+        return bool(self.google_oauth_client_secret_file or (self.google_oauth_client_id and self.google_oauth_client_secret))
 
     @property
     def llm_enabled(self) -> bool:

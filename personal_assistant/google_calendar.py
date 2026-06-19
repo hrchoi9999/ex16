@@ -44,7 +44,7 @@ class GoogleCalendarClient:
     def _service(self):
         from googleapiclient.discovery import build
 
-        if settings.google_oauth_client_secret_file:
+        if settings.google_oauth_enabled:
             credentials = self._oauth_credentials()
             return build("calendar", "v3", credentials=credentials)
 
@@ -79,15 +79,30 @@ class GoogleCalendarClient:
                     "Google OAuth를 사용하려면 google-auth-oauthlib 패키지가 필요합니다."
                 ) from exc
 
-            flow = InstalledAppFlow.from_client_secrets_file(
-                settings.google_oauth_client_secret_file,
-                CALENDAR_SCOPES,
-            )
+            flow = self._installed_app_flow(InstalledAppFlow)
             credentials = flow.run_local_server(port=0)
 
         token_path.parent.mkdir(parents=True, exist_ok=True)
         token_path.write_text(credentials.to_json(), encoding="utf-8")
         return credentials
+
+    @staticmethod
+    def _installed_app_flow(flow_class):
+        if settings.google_oauth_client_secret_file:
+            return flow_class.from_client_secrets_file(
+                settings.google_oauth_client_secret_file,
+                CALENDAR_SCOPES,
+            )
+        client_config = {
+            "installed": {
+                "client_id": settings.google_oauth_client_id,
+                "client_secret": settings.google_oauth_client_secret,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": ["http://localhost"],
+            }
+        }
+        return flow_class.from_client_config(client_config, CALENDAR_SCOPES)
 
     @staticmethod
     def _google_body(event: ScheduleEvent) -> dict[str, object]:
@@ -137,7 +152,10 @@ class GoogleCalendarClient:
             return GoogleAccountResult(
                 enabled=False,
                 success=False,
-                message="Google Calendar 설정이 없습니다. .env에 GOOGLE_OAUTH_CLIENT_SECRET_FILE 또는 GOOGLE_SERVICE_ACCOUNT_FILE을 설정하세요.",
+                message=(
+                    "Google Calendar OAuth 앱 설정이 아직 없습니다. 사용자가 키를 입력하는 것이 아니라, "
+                    "서비스 운영자가 한 번만 GOOGLE_OAUTH_CLIENT_ID/SECRET 또는 client_secret 파일을 서버에 설정해야 합니다."
+                ),
             )
 
         if settings.google_registered_email:
@@ -155,12 +173,12 @@ class GoogleCalendarClient:
                 return GoogleAccountResult(
                     enabled=True,
                     success=True,
-                    message="Google OAuth 인증이 완료되었습니다. 이메일은 GOOGLE_REGISTERED_EMAIL로 지정하면 표시됩니다.",
+                    message="Google 로그인과 Calendar 권한 동의가 완료되었습니다. 현재 보기 범위의 일정을 가져옵니다.",
                     email="google-user",
                     display_name="Google User",
                 )
             except Exception as exc:
-                return GoogleAccountResult(True, False, f"Google OAuth 인증에 실패했습니다. {exc}")
+                return GoogleAccountResult(True, False, f"Google 로그인 인증에 실패했습니다. {exc}")
 
         return GoogleAccountResult(
             enabled=True,

@@ -6,6 +6,7 @@ from datetime import date, datetime, time, timedelta
 from html import escape
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from personal_assistant.ai_chat import answer_schedule_question
 from personal_assistant.config import settings
@@ -604,6 +605,113 @@ def render_left(events: list[ScheduleEvent]) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def inject_resizer_component() -> None:
+    components.html(
+        """
+        <script>
+        (() => {
+          const doc = window.parent.document;
+          const storage = window.parent.localStorage;
+          const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+          function findLayout() {
+            return [...doc.querySelectorAll('[data-testid="stHorizontalBlock"]')]
+              .find((block) => block.querySelector('.layout-anchor'));
+          }
+
+          function setup() {
+            const block = findLayout();
+            if (!block || block.dataset.aiSchedulerResizable === '1') return;
+            const cols = [...block.querySelectorAll(':scope > [data-testid="stColumn"]')];
+            if (cols.length < 3) return;
+
+            block.dataset.aiSchedulerResizable = '1';
+            block.style.position = 'relative';
+
+            let leftWidth = Number(storage.getItem('aiScheduler.leftWidth') || 260);
+            let rightWidth = Number(storage.getItem('aiScheduler.rightWidth') || 500);
+
+            const leftHandle = doc.createElement('div');
+            const rightHandle = doc.createElement('div');
+            leftHandle.className = 'ai-scheduler-resizer ai-scheduler-resizer-left';
+            rightHandle.className = 'ai-scheduler-resizer ai-scheduler-resizer-right';
+            block.append(leftHandle, rightHandle);
+
+            const style = doc.createElement('style');
+            style.textContent = `
+              .ai-scheduler-resizer {
+                position: absolute;
+                top: 0;
+                width: 10px;
+                height: 100%;
+                z-index: 9999;
+                cursor: ew-resize;
+                background: transparent;
+                transform: translateX(-5px);
+              }
+              .ai-scheduler-resizer:hover,
+              .ai-scheduler-resizer.dragging {
+                background: rgba(37, 99, 235, .16);
+              }
+            `;
+            doc.head.appendChild(style);
+
+            function apply() {
+              leftWidth = clamp(leftWidth, 220, 420);
+              rightWidth = clamp(rightWidth, 360, 720);
+              cols[0].style.setProperty('flex', `0 0 ${leftWidth}px`, 'important');
+              cols[0].style.setProperty('width', `${leftWidth}px`, 'important');
+              cols[1].style.setProperty('flex', '1 1 auto', 'important');
+              cols[1].style.setProperty('min-width', '520px', 'important');
+              cols[2].style.setProperty('flex', `0 0 ${rightWidth}px`, 'important');
+              cols[2].style.setProperty('width', `${rightWidth}px`, 'important');
+              leftHandle.style.left = `${leftWidth}px`;
+              rightHandle.style.right = `${rightWidth}px`;
+              storage.setItem('aiScheduler.leftWidth', String(leftWidth));
+              storage.setItem('aiScheduler.rightWidth', String(rightWidth));
+            }
+
+            function drag(handle, side) {
+              handle.addEventListener('pointerdown', (event) => {
+                event.preventDefault();
+                handle.classList.add('dragging');
+                const rect = block.getBoundingClientRect();
+                const move = (moveEvent) => {
+                  if (side === 'left') {
+                    leftWidth = moveEvent.clientX - rect.left;
+                  } else {
+                    rightWidth = rect.right - moveEvent.clientX;
+                  }
+                  apply();
+                };
+                const up = () => {
+                  handle.classList.remove('dragging');
+                  doc.removeEventListener('pointermove', move);
+                  doc.removeEventListener('pointerup', up);
+                };
+                doc.addEventListener('pointermove', move);
+                doc.addEventListener('pointerup', up);
+              });
+            }
+
+            drag(leftHandle, 'left');
+            drag(rightHandle, 'right');
+            apply();
+          }
+
+          setup();
+          const observer = new MutationObserver(setup);
+          observer.observe(doc.body, { childList: true, subtree: true });
+          setTimeout(setup, 500);
+          setTimeout(setup, 1500);
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
     st.markdown("<p class='section-label'>Calendar View</p>", unsafe_allow_html=True)
     for view_mode, label in [("month", "월 보기"), ("week", "주 보기"), ("day", "일 보기")]:
         button_type = "primary" if st.session_state.view_mode == view_mode else "secondary"
@@ -614,9 +722,9 @@ def render_left(events: list[ScheduleEvent]) -> None:
 
     st.markdown("<p class='section-label'>Google Account</p>", unsafe_allow_html=True)
     active_user = store.get_active_user()
-    st.caption(active_user.email if active_user else "등록된 Google 계정 없음")
-    google_email = st.text_input("Google 이메일", value=settings.google_registered_email, placeholder="name@gmail.com")
-    if st.button("Google 계정 등록/연동", use_container_width=True):
+    st.caption(active_user.email if active_user else "Google 로그인으로 캘린더를 연결하세요.")
+    google_email = st.text_input("표시 이메일", value=settings.google_registered_email, placeholder="name@gmail.com")
+    if st.button("Google 로그인 열기", use_container_width=True):
         result = calendar_client.register_account()
         if result.success:
             email = google_email.strip() or result.email or "google-user"
@@ -893,7 +1001,12 @@ def render_ai_event_creator() -> None:
 def render_google_tools() -> None:
     st.markdown("### Google Calendar 연동")
     active_user = store.get_active_user()
-    st.caption(f"등록 계정: {active_user.email}" if active_user else "Google 계정을 먼저 등록하세요.")
+    st.caption(f"연결 계정: {active_user.email}" if active_user else "좌측의 Google 로그인 열기로 계정을 연결하세요.")
+    if not calendar_client.enabled:
+        st.warning(
+            "사용자에게 키를 입력시키는 방식이 아닙니다. 앱 운영자가 Google Cloud OAuth 클라이언트를 한 번 설정하면, "
+            "사용자는 화면에서 Google 로그인과 권한 동의만 진행합니다."
+        )
     if st.button("현재 보기 범위 가져오기", use_container_width=True):
         import_google_events_for_current_period()
         st.rerun()
@@ -966,6 +1079,8 @@ def main() -> None:
         render_center(all_events)
     with right:
         render_right(all_events)
+
+    inject_resizer_component()
 
     if st.session_state.show_day_dialog:
         day_editor_dialog(all_events)
