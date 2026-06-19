@@ -7,7 +7,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SHARED_SECRET_ENV = PROJECT_ROOT.parent / ".chatgptkey.env"
+
+if SHARED_SECRET_ENV.exists():
+    load_dotenv(SHARED_SECRET_ENV)
+load_dotenv(PROJECT_ROOT / ".env", override=True)
 
 
 @dataclass(frozen=True)

@@ -50,6 +50,14 @@ class GoogleCalendarClient:
     def __init__(self) -> None:
         self.enabled = settings.google_calendar_enabled
 
+    @staticmethod
+    def _token_path() -> Path:
+        configured = Path(settings.google_oauth_token_file)
+        name = configured.name.lower()
+        if name.startswith("client_secret_") or "apps.googleusercontent.com" in name:
+            return Path("data/google_token.json")
+        return configured
+
     def _service(self):
         from googleapiclient.discovery import build
 
@@ -66,7 +74,7 @@ class GoogleCalendarClient:
         return build("calendar", "v3", credentials=credentials)
 
     def _oauth_credentials(self):
-        token_path = Path(settings.google_oauth_token_file)
+        token_path = self._token_path()
         credentials = None
         if token_path.exists():
             from google.oauth2.credentials import Credentials
@@ -155,7 +163,7 @@ class GoogleCalendarClient:
                 flow.oauth2session.state = state
             flow.fetch_token(code=code)
             credentials = flow.credentials
-            token_path = Path(settings.google_oauth_token_file)
+            token_path = self._token_path()
             token_path.parent.mkdir(parents=True, exist_ok=True)
             token_path.write_text(credentials.to_json(), encoding="utf-8")
             return GoogleAccountResult(

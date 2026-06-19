@@ -647,7 +647,12 @@ def render_left(events: list[ScheduleEvent]) -> None:
     active_user = store.get_active_user()
     st.caption(active_user.email if active_user else "Google 로그인으로 캘린더를 연결하세요.")
     google_email = st.text_input("표시 이메일", value=settings.google_registered_email, placeholder="name@gmail.com")
-    if st.button("Google 로그인 열기", use_container_width=True):
+    if calendar_client.enabled and not st.session_state.google_auth_url:
+        result = calendar_client.start_oauth(login_hint=google_email.strip())
+        if result.success:
+            st.session_state.google_auth_url = result.authorization_url
+            st.session_state.google_auth_state = result.state
+    if st.button("Google 로그인 링크 새로 만들기", use_container_width=True):
         result = calendar_client.start_oauth(login_hint=google_email.strip())
         if result.success:
             st.session_state.google_auth_url = result.authorization_url
