@@ -99,6 +99,10 @@ def inject_styles() -> None:
         [data-testid="stAppViewContainer"], [data-testid="stMain"] {
             overflow-x: auto !important;
         }
+        [data-testid="stMain"] {
+            justify-content: flex-start !important;
+            align-items: stretch !important;
+        }
         [data-testid="stHorizontalBlock"]:has(.layout-anchor) {
             display: flex !important;
             flex-direction: row !important;
@@ -605,6 +609,43 @@ def render_left(events: list[ScheduleEvent]) -> None:
         """,
         unsafe_allow_html=True,
     )
+    st.markdown("<p class='section-label'>Calendar View</p>", unsafe_allow_html=True)
+    for view_mode, label in [("month", "월 보기"), ("week", "주 보기"), ("day", "일 보기")]:
+        button_type = "primary" if st.session_state.view_mode == view_mode else "secondary"
+        if st.button(label, key=f"view_{view_mode}", type=button_type, use_container_width=True):
+            st.session_state.view_mode = view_mode
+            st.query_params.clear()
+            st.rerun()
+
+    st.markdown("<p class='section-label'>Google Account</p>", unsafe_allow_html=True)
+    active_user = store.get_active_user()
+    st.caption(active_user.email if active_user else "Google 로그인으로 캘린더를 연결하세요.")
+    google_email = st.text_input("표시 이메일", value=settings.google_registered_email, placeholder="name@gmail.com")
+    if st.button("Google 로그인 열기", use_container_width=True):
+        result = calendar_client.register_account()
+        if result.success:
+            email = google_email.strip() or result.email or "google-user"
+            store.register_user(email=email, display_name=result.display_name)
+            import_google_events_for_current_period()
+        st.session_state.sync_message = result.message
+        st.session_state.right_menu = "Google 연동"
+        st.rerun()
+
+    st.markdown("<p class='section-label'>Interest Sites</p>", unsafe_allow_html=True)
+    if st.button("관심 사이트 지금 수집", use_container_width=True):
+        result = collect_interest_sites()
+        if result.success:
+            store.delete_candidates_by_sources(REQUESTED_SITE_SOURCES)
+        for candidate in result.candidates:
+            store.upsert_candidate(candidate)
+        st.session_state.last_site_collection_at = datetime.now()
+        st.session_state.site_message = result.message
+        st.session_state.right_menu = "관심 사이트"
+        st.rerun()
+    st.caption(st.session_state.site_message or "서버 시작 후 1회, 이후 3시간마다 자동 수집합니다.")
+
+    st.markdown("<p class='section-label'>Mini Calendar</p>", unsafe_allow_html=True)
+    st.markdown(mini_calendar_html(events), unsafe_allow_html=True)
 
 
 def inject_resizer_component() -> None:
@@ -712,43 +753,6 @@ def inject_resizer_component() -> None:
         height=0,
         width=0,
     )
-    st.markdown("<p class='section-label'>Calendar View</p>", unsafe_allow_html=True)
-    for view_mode, label in [("month", "월 보기"), ("week", "주 보기"), ("day", "일 보기")]:
-        button_type = "primary" if st.session_state.view_mode == view_mode else "secondary"
-        if st.button(label, key=f"view_{view_mode}", type=button_type, use_container_width=True):
-            st.session_state.view_mode = view_mode
-            st.query_params.clear()
-            st.rerun()
-
-    st.markdown("<p class='section-label'>Google Account</p>", unsafe_allow_html=True)
-    active_user = store.get_active_user()
-    st.caption(active_user.email if active_user else "Google 로그인으로 캘린더를 연결하세요.")
-    google_email = st.text_input("표시 이메일", value=settings.google_registered_email, placeholder="name@gmail.com")
-    if st.button("Google 로그인 열기", use_container_width=True):
-        result = calendar_client.register_account()
-        if result.success:
-            email = google_email.strip() or result.email or "google-user"
-            store.register_user(email=email, display_name=result.display_name)
-            import_google_events_for_current_period()
-        st.session_state.sync_message = result.message
-        st.session_state.right_menu = "Google 연동"
-        st.rerun()
-
-    st.markdown("<p class='section-label'>Interest Sites</p>", unsafe_allow_html=True)
-    if st.button("관심 사이트 지금 수집", use_container_width=True):
-        result = collect_interest_sites()
-        if result.success:
-            store.delete_candidates_by_sources(REQUESTED_SITE_SOURCES)
-        for candidate in result.candidates:
-            store.upsert_candidate(candidate)
-        st.session_state.last_site_collection_at = datetime.now()
-        st.session_state.site_message = result.message
-        st.session_state.right_menu = "관심 사이트"
-        st.rerun()
-    st.caption(st.session_state.site_message or "서버 시작 후 1회, 이후 3시간마다 자동 수집합니다.")
-
-    st.markdown("<p class='section-label'>Mini Calendar</p>", unsafe_allow_html=True)
-    st.markdown(mini_calendar_html(events), unsafe_allow_html=True)
 
 
 def render_center(events: list[ScheduleEvent]) -> None:
