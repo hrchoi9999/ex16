@@ -13,6 +13,8 @@
 ## 핵심 문서
 
 - 전체 역할 분담: `AGENT_WORK_ALLOCATION.md`
+- 업그레이드 실행 계획: `UPGRADE_EXECUTION_PLAN.md`
+- 업그레이드 backlog: `UPGRADE_BACKLOG.md`
 - 총괄 기획서: `planner_agent/SERVICE_PLAN.md`
 - 작업 이력: `planner_agent/HISTORY.md`
 - PC 디자인 기준: `design_agent/PC_DESIGN_SPEC.md`
@@ -40,3 +42,11 @@
 4. AI가 실행하는 작업은 사용자가 이해할 수 있는 계획과 결과 메시지를 남겨야 한다.
 5. 개인정보, 인증 토큰, 외부 계정 데이터는 코드와 git에 직접 저장하지 않는다.
 6. 작업 단위가 끝나면 테스트/배포 확인 후 commit 및 `hrchoi9999/ex16` 원격 push를 수행한다.
+
+## 업그레이드 작업 원칙
+
+1. 신규 기능 목록은 먼저 `UPGRADE_BACKLOG.md`에 등록한다.
+2. `planner_agent`가 기능별 주 담당/협업 agent를 지정한다.
+3. 각 agent는 자기 폴더의 `UPGRADE_TASKS.md`에 작업 범위와 완료 기준을 관리한다.
+4. `qa_agent`는 모든 개발 산출물에 대해 문서, 코드, 테스트, UI, 데이터, 보안, 배포 gate를 확인한다.
+5. 기능 구현이 완료되면 `planner_agent/HISTORY.md`에 KST 기준 작업 이력을 기록한다.
