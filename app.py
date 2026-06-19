@@ -46,6 +46,8 @@ def init_state() -> None:
     st.session_state.setdefault("highlight_event_ids", [])
     st.session_state.setdefault("show_day_dialog", False)
     st.session_state.setdefault("last_site_collection_at", None)
+    st.session_state.setdefault("google_auth_url", "")
+    st.session_state.setdefault("google_auth_state", "")
 
     query_view = st.query_params.get("view")
     query_date = st.query_params.get("date")
@@ -60,6 +62,30 @@ def init_state() -> None:
     if query_dialog == "1":
         st.session_state.show_day_dialog = True
         st.session_state.right_menu = "일정 편집"
+
+
+def handle_google_oauth_callback() -> None:
+    error = st.query_params.get("error")
+    code = st.query_params.get("code")
+    state = st.query_params.get("state") or st.session_state.google_auth_state
+    if error:
+        st.session_state.sync_message = f"Google 로그인이 취소되었거나 실패했습니다. {error}"
+        st.session_state.right_menu = "Google 연동"
+        st.query_params.clear()
+        st.rerun()
+    if not code:
+        return
+
+    result = calendar_client.finish_oauth(code=code, state=state)
+    if result.success:
+        store.register_user(email=result.email or "google-user", display_name=result.display_name)
+        st.session_state.google_auth_url = ""
+        st.session_state.google_auth_state = ""
+        import_google_events_for_current_period()
+    st.session_state.sync_message = result.message
+    st.session_state.right_menu = "Google 연동"
+    st.query_params.clear()
+    st.rerun()
 
 
 def inject_styles() -> None:
@@ -622,14 +648,15 @@ def render_left(events: list[ScheduleEvent]) -> None:
     st.caption(active_user.email if active_user else "Google 로그인으로 캘린더를 연결하세요.")
     google_email = st.text_input("표시 이메일", value=settings.google_registered_email, placeholder="name@gmail.com")
     if st.button("Google 로그인 열기", use_container_width=True):
-        result = calendar_client.register_account()
+        result = calendar_client.start_oauth(login_hint=google_email.strip())
         if result.success:
-            email = google_email.strip() or result.email or "google-user"
-            store.register_user(email=email, display_name=result.display_name)
-            import_google_events_for_current_period()
+            st.session_state.google_auth_url = result.authorization_url
+            st.session_state.google_auth_state = result.state
         st.session_state.sync_message = result.message
         st.session_state.right_menu = "Google 연동"
         st.rerun()
+    if st.session_state.google_auth_url:
+        st.link_button("Google 로그인 화면 열기", st.session_state.google_auth_url, use_container_width=True)
 
     st.markdown("<p class='section-label'>Interest Sites</p>", unsafe_allow_html=True)
     if st.button("관심 사이트 지금 수집", use_container_width=True):
@@ -1021,9 +1048,19 @@ def render_google_tools() -> None:
     st.caption(f"연결 계정: {active_user.email}" if active_user else "좌측의 Google 로그인 열기로 계정을 연결하세요.")
     if not calendar_client.enabled:
         st.warning(
-            "사용자에게 키를 입력시키는 방식이 아닙니다. 앱 운영자가 Google Cloud OAuth 클라이언트를 한 번 설정하면, "
-            "사용자는 화면에서 Google 로그인과 권한 동의만 진행합니다."
+            "Gmail 로그인 연동은 가능합니다. 다만 현재 앱에 Google OAuth 클라이언트 설정이 없어 로그인 URL을 만들 수 없습니다. "
+            "운영자가 Google Cloud에서 Calendar API를 켜고 OAuth 클라이언트 ID/Secret 및 redirect URI를 설정해야 합니다."
         )
+    else:
+        if st.button("Google 로그인 URL 생성", use_container_width=True):
+            result = calendar_client.start_oauth(settings.google_registered_email)
+            if result.success:
+                st.session_state.google_auth_url = result.authorization_url
+                st.session_state.google_auth_state = result.state
+            st.session_state.sync_message = result.message
+            st.rerun()
+        if st.session_state.google_auth_url:
+            st.link_button("Google 로그인 화면 열기", st.session_state.google_auth_url, use_container_width=True)
     if st.button("현재 보기 범위 가져오기", use_container_width=True):
         import_google_events_for_current_period()
         st.rerun()
@@ -1086,6 +1123,7 @@ def day_editor_dialog(events: list[ScheduleEvent]) -> None:
 def main() -> None:
     init_state()
     inject_styles()
+    handle_google_oauth_callback()
     run_auto_site_collection()
 
     all_events = store.list_events(include_past=True)

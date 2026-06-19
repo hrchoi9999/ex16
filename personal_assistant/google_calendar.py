@@ -37,6 +37,15 @@ class GoogleAccountResult:
     display_name: str = ""
 
 
+@dataclass
+class GoogleOAuthStartResult:
+    enabled: bool
+    success: bool
+    message: str
+    authorization_url: str = ""
+    state: str = ""
+
+
 class GoogleCalendarClient:
     def __init__(self) -> None:
         self.enabled = settings.google_calendar_enabled
@@ -72,37 +81,92 @@ class GoogleCalendarClient:
 
             credentials.refresh(Request())
         else:
-            try:
-                from google_auth_oauthlib.flow import InstalledAppFlow
-            except ImportError as exc:
-                raise RuntimeError(
-                    "Google OAuth를 사용하려면 google-auth-oauthlib 패키지가 필요합니다."
-                ) from exc
-
-            flow = self._installed_app_flow(InstalledAppFlow)
-            credentials = flow.run_local_server(port=0)
+            raise RuntimeError("Google 로그인이 필요합니다. 앱 화면에서 Google 로그인 URL을 먼저 여세요.")
 
         token_path.parent.mkdir(parents=True, exist_ok=True)
         token_path.write_text(credentials.to_json(), encoding="utf-8")
         return credentials
 
     @staticmethod
-    def _installed_app_flow(flow_class):
+    def _oauth_flow(flow_class):
         if settings.google_oauth_client_secret_file:
-            return flow_class.from_client_secrets_file(
+            flow = flow_class.from_client_secrets_file(
                 settings.google_oauth_client_secret_file,
                 CALENDAR_SCOPES,
             )
-        client_config = {
-            "installed": {
-                "client_id": settings.google_oauth_client_id,
-                "client_secret": settings.google_oauth_client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": ["http://localhost"],
+        else:
+            client_config = {
+                "web": {
+                    "client_id": settings.google_oauth_client_id,
+                    "client_secret": settings.google_oauth_client_secret,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": [settings.google_oauth_redirect_uri],
+                }
             }
+            flow = flow_class.from_client_config(client_config, CALENDAR_SCOPES)
+        flow.redirect_uri = settings.google_oauth_redirect_uri
+        return flow
+
+    def start_oauth(self, login_hint: str = "") -> GoogleOAuthStartResult:
+        if not settings.google_oauth_enabled:
+            return GoogleOAuthStartResult(
+                enabled=False,
+                success=False,
+                message=(
+                    "Google 로그인 URL을 만들 수 없습니다. 서비스 운영자가 Google Cloud에서 OAuth 클라이언트를 만들고 "
+                    "GOOGLE_OAUTH_CLIENT_ID/SECRET 또는 GOOGLE_OAUTH_CLIENT_SECRET_FILE을 설정해야 합니다."
+                ),
+            )
+        try:
+            from google_auth_oauthlib.flow import Flow
+        except ImportError as exc:
+            return GoogleOAuthStartResult(
+                enabled=True,
+                success=False,
+                message=f"Google OAuth 패키지가 설치되어 있지 않습니다. google-auth-oauthlib 설치가 필요합니다. {exc}",
+            )
+
+        flow = self._oauth_flow(Flow)
+        kwargs = {
+            "access_type": "offline",
+            "include_granted_scopes": "true",
+            "prompt": "consent",
         }
-        return flow_class.from_client_config(client_config, CALENDAR_SCOPES)
+        if login_hint:
+            kwargs["login_hint"] = login_hint
+        authorization_url, state = flow.authorization_url(**kwargs)
+        return GoogleOAuthStartResult(
+            enabled=True,
+            success=True,
+            message="Google 로그인 화면을 열어 Calendar 권한에 동의하세요. 동의 후 이 앱으로 자동 돌아옵니다.",
+            authorization_url=authorization_url,
+            state=state,
+        )
+
+    def finish_oauth(self, code: str, state: str = "") -> GoogleAccountResult:
+        if not settings.google_oauth_enabled:
+            return GoogleAccountResult(False, False, "Google OAuth 클라이언트 설정이 없습니다.")
+        try:
+            from google_auth_oauthlib.flow import Flow
+
+            flow = self._oauth_flow(Flow)
+            if state:
+                flow.oauth2session.state = state
+            flow.fetch_token(code=code)
+            credentials = flow.credentials
+            token_path = Path(settings.google_oauth_token_file)
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            token_path.write_text(credentials.to_json(), encoding="utf-8")
+            return GoogleAccountResult(
+                enabled=True,
+                success=True,
+                message="Google 로그인과 Calendar 권한 동의가 완료되었습니다.",
+                email=settings.google_registered_email or "google-user",
+                display_name=(settings.google_registered_email.split("@")[0] if settings.google_registered_email else "Google User"),
+            )
+        except Exception as exc:
+            return GoogleAccountResult(True, False, f"Google OAuth 콜백 처리에 실패했습니다. {exc}")
 
     @staticmethod
     def _google_body(event: ScheduleEvent) -> dict[str, object]:
@@ -167,16 +231,10 @@ class GoogleCalendarClient:
                 display_name=settings.google_registered_email.split("@")[0],
             )
 
-        if settings.google_oauth_client_secret_file:
+        if settings.google_oauth_enabled:
             try:
-                self._oauth_credentials()
-                return GoogleAccountResult(
-                    enabled=True,
-                    success=True,
-                    message="Google 로그인과 Calendar 권한 동의가 완료되었습니다. 현재 보기 범위의 일정을 가져옵니다.",
-                    email="google-user",
-                    display_name="Google User",
-                )
+                start = self.start_oauth()
+                return GoogleAccountResult(start.enabled, start.success, start.message, email="google-user", display_name="Google User")
             except Exception as exc:
                 return GoogleAccountResult(True, False, f"Google 로그인 인증에 실패했습니다. {exc}")
 
