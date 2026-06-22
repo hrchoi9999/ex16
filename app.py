@@ -505,8 +505,9 @@ def inject_styles() -> None:
             border-radius: 0;
             background: transparent;
             color: #4b5563;
-            font-size: .66rem;
+            font-size: .75rem;
             font-weight: 600;
+            line-height: 1.25;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
