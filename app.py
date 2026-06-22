@@ -1552,22 +1552,29 @@ def render_event_editor(events: list[ScheduleEvent], prefix: str = "main") -> No
     )
     with st.form(f"{prefix}_create_form", clear_on_submit=True):
         title = st.text_input("제목", key=f"{prefix}_manual_title")
-        start_time = st.time_input("시작 시간", value=time(9, 0), key=f"{prefix}_manual_time")
-        duration = st.number_input("소요 시간(분)", 15, 720, 60, 15, key=f"{prefix}_manual_duration")
+        date_col1, date_col2 = st.columns(2)
+        start_day = date_col1.date_input("시작일", value=selected, key=f"{prefix}_manual_start_date")
+        end_day = date_col2.date_input("종료일", value=selected, key=f"{prefix}_manual_end_date")
+        time_col1, time_col2 = st.columns(2)
+        start_time = time_col1.time_input("시작 시간", value=time(9, 0), key=f"{prefix}_manual_start_time")
+        end_time = time_col2.time_input("종료 시간", value=time(10, 0), key=f"{prefix}_manual_end_time")
         importance = st.slider("중요도", 1, 5, 3, key=f"{prefix}_manual_importance")
         description = st.text_area("설명", key=f"{prefix}_manual_description", height=80)
         submitted = st.form_submit_button("일정 등록", type="primary", use_container_width=True)
         if submitted:
             if not title.strip():
                 st.warning("제목을 입력해 주세요.")
+            elif datetime.combine(end_day, end_time) <= datetime.combine(start_day, start_time):
+                st.warning("종료일/시간은 시작일/시간보다 이후여야 합니다.")
             else:
-                start_at = datetime.combine(selected, start_time)
+                start_at = datetime.combine(start_day, start_time)
+                end_at = datetime.combine(end_day, end_time)
                 create_event(
                     ScheduleEvent(
                         id=None,
                         title=title.strip(),
                         start_at=start_at,
-                        end_at=start_at + timedelta(minutes=int(duration)),
+                        end_at=end_at,
                         description=description.strip(),
                         importance=int(importance),
                     )
@@ -1581,25 +1588,50 @@ def render_event_editor(events: list[ScheduleEvent], prefix: str = "main") -> No
         with st.form(f"{prefix}_edit_event_{event.id}"):
             st.markdown(f"**{event.title}**")
             updated_title = st.text_input("제목", value=event.title, key=f"{prefix}_title_{event.id}")
-            updated_time = st.time_input("시작 시간", value=event.start_at.time(), key=f"{prefix}_time_{event.id}")
-            updated_minutes = max(int((event.end_at - event.start_at).total_seconds() // 60), 15)
-            updated_duration = st.number_input("소요 시간(분)", 15, 720, updated_minutes, 15, key=f"{prefix}_duration_{event.id}")
+            edit_date_col1, edit_date_col2 = st.columns(2)
+            updated_start_day = edit_date_col1.date_input(
+                "시작일",
+                value=event.start_at.date(),
+                key=f"{prefix}_start_date_{event.id}",
+            )
+            updated_end_day = edit_date_col2.date_input(
+                "종료일",
+                value=event.end_at.date(),
+                key=f"{prefix}_end_date_{event.id}",
+            )
+            edit_time_col1, edit_time_col2 = st.columns(2)
+            updated_start_time = edit_time_col1.time_input(
+                "시작 시간",
+                value=event.start_at.time(),
+                key=f"{prefix}_start_time_{event.id}",
+            )
+            updated_end_time = edit_time_col2.time_input(
+                "종료 시간",
+                value=event.end_at.time(),
+                key=f"{prefix}_end_time_{event.id}",
+            )
             updated_importance = st.slider("중요도", 1, 5, event.importance, key=f"{prefix}_importance_{event.id}")
             updated_description = st.text_area("설명", value=event.description, key=f"{prefix}_description_{event.id}", height=70)
             save_col, delete_col = st.columns(2)
             save = save_col.form_submit_button("수정 저장", use_container_width=True)
             remove = delete_col.form_submit_button("삭제", use_container_width=True)
             if save:
-                start_at = datetime.combine(st.session_state.selected_date, updated_time)
-                update_event(
-                    event,
-                    title=updated_title.strip(),
-                    start_at=start_at,
-                    end_at=start_at + timedelta(minutes=int(updated_duration)),
-                    description=updated_description.strip(),
-                    importance=int(updated_importance),
-                )
-                st.rerun()
+                start_at = datetime.combine(updated_start_day, updated_start_time)
+                end_at = datetime.combine(updated_end_day, updated_end_time)
+                if not updated_title.strip():
+                    st.warning("제목을 입력해 주세요.")
+                elif end_at <= start_at:
+                    st.warning("종료일/시간은 시작일/시간보다 이후여야 합니다.")
+                else:
+                    update_event(
+                        event,
+                        title=updated_title.strip(),
+                        start_at=start_at,
+                        end_at=end_at,
+                        description=updated_description.strip(),
+                        importance=int(updated_importance),
+                    )
+                    st.rerun()
             if remove:
                 delete_event(event)
                 st.rerun()
