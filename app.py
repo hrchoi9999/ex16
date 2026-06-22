@@ -452,14 +452,15 @@ def inject_styles() -> None:
         }
         .right-title {
             margin: 0 0 12px;
-            font-size: 1.2rem;
+            font-size: 20px !important;
+            line-height: 1.15 !important;
             font-weight: 900;
         }
         .panel-section-title {
             margin: 0 0 14px;
             color: var(--text);
-            font-size: 1.2rem;
-            line-height: 1.2;
+            font-size: 20px !important;
+            line-height: 1.15 !important;
             font-weight: 850;
         }
         .right-content {
@@ -1027,7 +1028,10 @@ def timeline_event_html(event: ScheduleEvent) -> str:
 
 
 def render_right(events: list[ScheduleEvent]) -> None:
-    st.markdown("<h2 class='right-title'>작업 메뉴</h2>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='right-title' style='font-size:20px !important;line-height:1.15 !important;'>작업 메뉴</div>",
+        unsafe_allow_html=True,
+    )
     menu = st.radio(
         "메뉴 선택",
         RIGHT_MENUS,
@@ -1069,7 +1073,10 @@ def render_right_content(events: list[ScheduleEvent], menu: str) -> None:
 def render_selected_detail(events: list[ScheduleEvent]) -> None:
     selected = st.session_state.selected_date
     day_events = events_for_day(events, selected)
-    st.markdown(f"### {selected:%Y-%m-%d} 상세")
+    st.markdown(
+        f"<div class='panel-section-title' style='font-size:20px !important;line-height:1.15 !important;'>{selected:%Y-%m-%d} 상세</div>",
+        unsafe_allow_html=True,
+    )
     if not day_events:
         st.caption("선택된 날짜에 일정이 없습니다.")
         return
