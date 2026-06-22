@@ -10,6 +10,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from personal_assistant.ai_chat import answer_schedule_question
+from personal_assistant.ai_router import route_ai_command
 from personal_assistant.briefing import generate_briefing
 from personal_assistant.business_days import (
     eligible_registration_days,
@@ -926,6 +927,105 @@ def create_and_store_briefing(events: list[ScheduleEvent], scope: str) -> None:
     )
     saved = store.upsert_briefing_snapshot(snapshot)
     st.session_state.briefing_message = f"{saved.scope_label} 브리핑을 생성했습니다."
+
+
+def chat_reply(question: str, answer: str) -> None:
+    st.session_state.chat_history.append({"question": question, "answer": answer})
+
+
+def handle_ai_chat_command(question: str, events: list[ScheduleEvent]) -> None:
+    route = route_ai_command(question)
+    st.session_state.right_menu = route.menu
+    if route.intent == "query":
+        result = answer_schedule_question(question, events)
+        st.session_state.highlight_event_ids = result.matched_event_ids
+        chat_reply(question, result.answer)
+        return
+    if route.intent == "create_event":
+        parsed = parser.parse(question)
+        if parsed.event is None:
+            chat_reply(question, parsed.message)
+            st.session_state.right_menu = "일정 편집"
+            return
+        saved = create_event(parsed.event)
+        st.session_state.selected_date = saved.start_at.date()
+        st.session_state.view_mode = "month"
+        st.session_state.highlight_event_ids = [int(saved.id)] if saved.id is not None else []
+        chat_reply(question, f"일정을 등록했습니다.\n- 제목: {saved.title}\n- 날짜: {saved.date_label}\n- 시간: {saved.time_label}")
+        return
+    if route.intent == "google_sync":
+        before = len(store.list_events(include_past=True))
+        import_google_events_for_current_period()
+        after = len(store.list_events(include_past=True))
+        chat_reply(question, f"Google Calendar 현재 보기 범위 가져오기를 실행했습니다. 저장된 일정 수: {before}개 → {after}개")
+        return
+    if route.intent == "collect_sites":
+        result = collect_interest_sites()
+        if result.success:
+            store.delete_candidates_by_sources(REQUESTED_SITE_SOURCES)
+        for candidate in result.candidates:
+            store.upsert_candidate(candidate)
+        st.session_state.last_site_collection_at = datetime.now()
+        st.session_state.site_message = result.message
+        chat_reply(question, f"관심 사이트 수집을 실행했습니다. {result.message}")
+        return
+    if route.intent == "priority":
+        recommendations = recommend_priorities([event for event in events if event.end_at >= datetime.now()])
+        st.session_state.highlight_event_ids = [int(item.event.id) for item in recommendations[:5] if item.event.id is not None]
+        if recommendations:
+            lines = ["우선순위 추천 상위 일정입니다."]
+            for item in recommendations[:5]:
+                lines.append(f"- {item.event.date_label} {item.event.time_label}: {item.event.title} · {item.reason}")
+            chat_reply(question, "\n".join(lines))
+        else:
+            chat_reply(question, "추천할 예정 일정이 없습니다.")
+        return
+    if route.intent == "risk":
+        scan_and_store_risks(events)
+        risky = sorted(store.list_risk_assessments(), key=lambda item: item.risk_score, reverse=True)[:5]
+        st.session_state.highlight_event_ids = [item.event_id for item in risky]
+        if risky:
+            event_by_id = {int(event.id): event for event in events if event.id is not None}
+            lines = ["리스크 코치 분석을 실행했습니다."]
+            for item in risky:
+                event = event_by_id.get(item.event_id)
+                title = event.title if event else f"event-{item.event_id}"
+                lines.append(f"- {item.level_label} {item.risk_score}: {title} · {item.next_action}")
+            chat_reply(question, "\n".join(lines))
+        else:
+            chat_reply(question, "분석할 리스크 일정이 없습니다.")
+        return
+    if route.intent == "execution_plan":
+        selected_events = events_for_day(events, st.session_state.selected_date)
+        target = selected_events[0] if selected_events else next((event for event in events if event.id is not None), None)
+        if target is None or target.id is None:
+            chat_reply(question, "실행 계획을 만들 일정이 없습니다. 먼저 일정을 선택하거나 등록해 주세요.")
+            return
+        items = store.replace_task_plan(int(target.id), generate_task_plan(target))
+        st.session_state.execution_plan_event_id = int(target.id)
+        st.session_state.selected_date = target.start_at.date()
+        st.session_state.highlight_event_ids = [int(target.id)]
+        chat_reply(question, f"`{target.title}` 일정의 실행 계획 {len(items)}개를 생성했습니다.")
+        return
+    if route.intent == "briefing":
+        create_and_store_briefing(events, "week" if "주" in question else "day")
+        chat_reply(question, st.session_state.briefing_message or "브리핑을 생성했습니다.")
+        return
+    if route.intent == "delete_help":
+        chat_reply(question, "삭제는 안전을 위해 자동 실행하지 않습니다. `일정 편집` 메뉴에서 선택 날짜의 일정을 확인한 뒤 삭제해 주세요.")
+        return
+    if route.intent == "edit_help":
+        chat_reply(question, "수정은 안전을 위해 자동 실행하지 않습니다. `일정 편집` 메뉴로 이동했습니다. 선택 날짜의 일정에서 시작/종료일과 시간을 수정해 주세요.")
+        return
+    chat_reply(question, f"`{route.menu}` 메뉴로 이동했습니다.")
+
+
+def sync_query_params_from_state() -> None:
+    st.query_params["view"] = st.session_state.view_mode
+    st.query_params["date"] = st.session_state.selected_date.isoformat()
+    st.query_params["menu"] = st.session_state.right_menu
+    if "dialog" in st.query_params:
+        del st.query_params["dialog"]
 
 
 def briefing_scope_key(scope: str) -> str:
@@ -1864,11 +1964,9 @@ def render_ai_chat_input(events: list[ScheduleEvent]) -> None:
         )
         submitted = send_col.form_submit_button("전송", type="primary", use_container_width=True)
         if submitted:
-            result = answer_schedule_question(question, events)
-            st.session_state.highlight_event_ids = result.matched_event_ids
-            st.session_state.chat_history.append({"question": question, "answer": result.answer})
-            st.session_state.right_menu = "상세 정보"
-            st.session_state.sync_message = "AI 채팅 응답을 우측 상세 정보에 표시했습니다."
+            handle_ai_chat_command(question, events)
+            sync_query_params_from_state()
+            st.session_state.sync_message = "AI 채팅 명령을 처리했습니다."
             st.rerun()
 
 
