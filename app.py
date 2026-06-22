@@ -375,9 +375,11 @@ def inject_styles() -> None:
             border: 0 !important;
             box-shadow: none !important;
             color: var(--text) !important;
-            min-height: 22px !important;
+            justify-content: flex-start !important;
+            min-height: 18px !important;
             padding: 0 !important;
-            font-size: .86rem !important;
+            text-align: left !important;
+            font-size: .82rem !important;
             font-weight: 520 !important;
         }
         div[class*="st-key-month_day_"] button:hover,
@@ -391,6 +393,23 @@ def inject_styles() -> None:
             border: 0 !important;
             color: var(--muted) !important;
             opacity: .45 !important;
+        }
+        div[class*="st-key-month_cell_"] {
+            min-height: 112px !important;
+            padding: 8px !important;
+            border-right: 1px solid var(--line-soft) !important;
+            border-bottom: 1px solid var(--line-soft) !important;
+            border-radius: 0 !important;
+            background: #fff !important;
+            overflow: hidden !important;
+        }
+        div[class*="st-key-month_cell_outside_"] {
+            background: #f8fafc !important;
+            opacity: .58 !important;
+        }
+        div[class*="st-key-month_cell_selected_"] {
+            box-shadow: inset 0 0 0 2px var(--primary) !important;
+            background: #eef5ff !important;
         }
         .event-pill {
             display: block;
@@ -985,23 +1004,21 @@ def render_center(events: list[ScheduleEvent]) -> None:
 
 def render_month(events: list[ScheduleEvent], selected: date) -> None:
     month = selected.replace(day=1)
-    head_cols = st.columns(7, gap="small")
+    head_cols = st.columns(7, gap=None)
     for col, label in zip(head_cols, WEEKDAY_LABELS):
         col.markdown(f"<div class='month-head'>{label}</div>", unsafe_allow_html=True)
     for week in calendar.Calendar(firstweekday=0).monthdatescalendar(month.year, month.month):
-        cols = st.columns(7, gap="small")
+        cols = st.columns(7, gap=None)
         for col, day in zip(cols, week):
             day_events = events_for_day(events, day)
-            button_type = "primary" if day == selected else "secondary"
+            cell_state = "selected" if day == selected else ("outside" if day.month != month.month else "normal")
             label = f"{day.day}"
-            if day == date.today():
-                label = f"{day.day} 오늘"
-            with col.container(height=112, border=False):
+            with col.container(height=112, border=False, key=f"month_cell_{cell_state}_{day.isoformat()}"):
                 if st.button(
                     label,
                     key=f"month_day_{day.isoformat()}",
-                    type=button_type,
-                    use_container_width=True,
+                    type="secondary",
+                    use_container_width=False,
                     disabled=day.month != month.month,
                 ):
                     select_calendar_day(day, "month", day_events)
