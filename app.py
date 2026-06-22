@@ -11,7 +11,14 @@ import streamlit.components.v1 as components
 
 from personal_assistant.ai_chat import answer_schedule_question
 from personal_assistant.briefing import generate_briefing
-from personal_assistant.business_days import eligible_registration_days, holiday_dates_from_events
+from personal_assistant.business_days import (
+    eligible_registration_days,
+    holiday_dates_from_events,
+    is_business_day,
+    is_holiday_event,
+    is_known_korean_holiday,
+    is_weekend,
+)
 from personal_assistant.config import settings
 from personal_assistant.database import ScheduleStore
 from personal_assistant.execution_planner import STAGE_LABELS, generate_task_plan
@@ -283,6 +290,9 @@ def inject_styles() -> None:
             justify-content: center;
             color: var(--muted);
         }
+        .mini-cell.non-working {
+            color: #dc2626;
+        }
         .mini-cell.today {
             background: var(--primary);
             color: #fff;
@@ -365,6 +375,9 @@ def inject_styles() -> None:
             padding: 10px;
             border-right: 1px solid var(--line-soft);
             border-bottom: 1px solid var(--line-soft);
+        }
+        .month-head.non-working {
+            color: #dc2626;
         }
         .day-link {
             display: block;
@@ -696,8 +709,19 @@ def period_bounds(selected: date, view_mode: str) -> tuple[datetime, datetime]:
     return datetime.combine(start, time.min), datetime.combine(end, time.min)
 
 
-def events_for_day(events: list[ScheduleEvent], day: date) -> list[ScheduleEvent]:
-    return [event for event in events if event.start_at.date() <= day <= event.end_at.date()]
+def should_show_event_on_day(event: ScheduleEvent, day: date, holiday_dates: set[date]) -> bool:
+    if not event.start_at.date() <= day <= event.end_at.date():
+        return False
+    if event.start_at.date() == event.end_at.date():
+        return True
+    if is_holiday_event(event) or event.title.startswith("[마감]") or bool(event.source_url):
+        return True
+    return is_business_day(day, holiday_dates)
+
+
+def events_for_day(events: list[ScheduleEvent], day: date, holiday_dates: set[date] | None = None) -> list[ScheduleEvent]:
+    dates = holiday_dates if holiday_dates is not None else holiday_dates_from_events(events)
+    return [event for event in events if should_show_event_on_day(event, day, dates)]
 
 
 def events_in_period(events: list[ScheduleEvent], start_at: datetime, end_at: datetime) -> list[ScheduleEvent]:
@@ -960,22 +984,45 @@ def save_candidate_deadline_event(candidate: ExternalScheduleCandidate) -> Sched
 def mini_calendar_html(events: list[ScheduleEvent]) -> str:
     selected = st.session_state.selected_date
     month = selected.replace(day=1)
-    event_days = {event.start_at.date() for event in events}
+    holiday_dates = holiday_dates_from_events(events)
     parts = [f"<p style='font-weight:900;margin:0 0 8px;'>{selected:%Y년 %m월}</p>", "<div class='mini-grid'>"]
     for label in ["일", "월", "화", "수", "목", "금", "토"]:
         parts.append(f"<div class='mini-cell' style='font-weight:900'>{label}</div>")
     for week in calendar.Calendar(firstweekday=6).monthdatescalendar(month.year, month.month):
         for day in week:
             classes = ["mini-cell"]
+            if is_weekend(day) or is_known_korean_holiday(day, holiday_dates):
+                classes.append("non-working")
             if day == date.today():
                 classes.append("today")
             if day == selected:
                 classes.append("selected")
-            suffix = "•" if day in event_days else ""
+            suffix = "•" if events_for_day(events, day, holiday_dates) else ""
             opacity = "opacity:.35;" if day.month != month.month else ""
             parts.append(f"<div class='{' '.join(classes)}' style='{opacity}'>{day.day}{suffix}</div>")
     parts.append("</div>")
     return "".join(parts)
+
+
+def non_working_day_style(days: list[date], events: list[ScheduleEvent]) -> str:
+    holiday_dates = holiday_dates_from_events(events)
+    selectors: list[str] = []
+    for day in days:
+        if is_weekend(day) or is_known_korean_holiday(day, holiday_dates):
+            key = day.isoformat()
+            selectors.extend(
+                [
+                    f'div[class*="st-key-month_day_{key}"] button',
+                    f'div[class*="st-key-month_day_{key}"] button p',
+                    f'div[class*="st-key-month_day_{key}"] button span',
+                    f'div[class*="st-key-week_day_{key}"] button',
+                    f'div[class*="st-key-week_day_{key}"] button p',
+                    f'div[class*="st-key-week_day_{key}"] button span',
+                ]
+            )
+    if not selectors:
+        return ""
+    return f"<style>{', '.join(selectors)} {{ color: #dc2626 !important; }}</style>"
 
 
 def render_left(events: list[ScheduleEvent]) -> None:
@@ -1202,13 +1249,18 @@ def render_center(events: list[ScheduleEvent]) -> None:
 
 def render_month(events: list[ScheduleEvent], selected: date) -> None:
     month = selected.replace(day=1)
+    month_weeks = calendar.Calendar(firstweekday=0).monthdatescalendar(month.year, month.month)
+    visible_days = [day for week in month_weeks for day in week if day.month == month.month]
+    holiday_dates = holiday_dates_from_events(events)
+    st.markdown(non_working_day_style(visible_days, events), unsafe_allow_html=True)
     head_cols = st.columns(7, gap=None)
-    for col, label in zip(head_cols, WEEKDAY_LABELS):
-        col.markdown(f"<div class='month-head'>{label}</div>", unsafe_allow_html=True)
-    for week in calendar.Calendar(firstweekday=0).monthdatescalendar(month.year, month.month):
+    for index, (col, label) in enumerate(zip(head_cols, WEEKDAY_LABELS)):
+        class_name = "month-head non-working" if index >= 5 else "month-head"
+        col.markdown(f"<div class='{class_name}'>{label}</div>", unsafe_allow_html=True)
+    for week in month_weeks:
         cols = st.columns(7, gap=None)
         for col, day in zip(cols, week):
-            day_events = events_for_day(events, day)
+            day_events = events_for_day(events, day, holiday_dates)
             cell_state = "selected" if day == selected else ("outside" if day.month != month.month else "normal")
             label = f"{day.day}"
             with col.container(height=112, border=False, key=f"month_cell_{cell_state}_{day.isoformat()}"):
@@ -1231,26 +1283,27 @@ def render_month(events: list[ScheduleEvent], selected: date) -> None:
 
 def render_week(events: list[ScheduleEvent], selected: date) -> None:
     start = week_start(selected)
+    week_days = [start + timedelta(days=index) for index in range(7)]
+    holiday_dates = holiday_dates_from_events(events)
+    st.markdown(non_working_day_style(week_days, events), unsafe_allow_html=True)
     header_cols = st.columns([0.5, 1, 1, 1, 1, 1, 1, 1], gap="small")
     header_cols[0].markdown("<div class='week-head-link' style='background:#fff;border-left:0;'>&nbsp;</div>", unsafe_allow_html=True)
-    for index in range(7):
-        day = start + timedelta(days=index)
+    for index, day in enumerate(week_days):
         header_cols[index + 1].button(
             f"{WEEKDAY_LABELS[index]} {day.day}",
             key=f"week_day_{day.isoformat()}",
             type="primary" if day == selected else "secondary",
             use_container_width=True,
             on_click=select_calendar_day,
-            args=(day, "week", bool(events_for_day(events, day))),
+            args=(day, "week", bool(events_for_day(events, day, holiday_dates))),
         )
 
     grid_parts = ["<div class='week-grid'><div>"]
     for hour in range(7, 21):
         grid_parts.append(f"<div class='time-cell'>{hour:02d}:00</div>")
     grid_parts.append("</div>")
-    for index in range(7):
-        day = start + timedelta(days=index)
-        body = "".join(timeline_event_html(event) for event in events_for_day(events, day))
+    for day in week_days:
+        body = "".join(timeline_event_html(event) for event in events_for_day(events, day, holiday_dates))
         grid_parts.append(f"<div class='week-col'>{body}</div>")
     grid_parts.append("</div>")
     st.html("".join(grid_parts))
