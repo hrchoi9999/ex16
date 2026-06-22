@@ -25,3 +25,18 @@ def test_ai_chat_reports_empty_schedule(monkeypatch) -> None:
 
     assert "등록된 일정이 없습니다" in result.answer
     assert result.matched_event_ids == []
+
+
+def test_ai_chat_answers_event_end_time(monkeypatch) -> None:
+    monkeypatch.setattr(ai_chat, "settings", SimpleNamespace(gemini_api_key=""))
+    event = ScheduleEvent(
+        id=7,
+        title="AI 에이전트 자동화 실무양성 교육",
+        start_at=datetime(2026, 5, 28, 9, 0),
+        end_at=datetime(2026, 6, 26, 18, 0),
+    )
+
+    result = answer_schedule_question("AI 에이전트 자동화 실무양성 교육은 언제 끝나지?", [event])
+
+    assert "2026-06-26 18:00" in result.answer
+    assert result.matched_event_ids == [7]
