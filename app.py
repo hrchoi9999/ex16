@@ -451,8 +451,15 @@ def inject_styles() -> None:
         }
         .right-title {
             margin: 0 0 12px;
-            font-size: 1.35rem;
+            font-size: 1.2rem;
             font-weight: 900;
+        }
+        .panel-section-title {
+            margin: 0 0 14px;
+            color: var(--text);
+            font-size: 1.2rem;
+            line-height: 1.2;
+            font-weight: 850;
         }
         .right-content {
             height: 560px;
@@ -1091,7 +1098,10 @@ def render_chat_history() -> None:
 def render_event_editor(events: list[ScheduleEvent], prefix: str = "main") -> None:
     selected = st.session_state.selected_date
     day_events = events_for_day(events, selected)
-    st.markdown(f"### {selected:%Y-%m-%d} 일정/작업 입력")
+    st.markdown(
+        f"<h3 class='panel-section-title'>{selected:%Y-%m-%d} 일정/작업 입력</h3>",
+        unsafe_allow_html=True,
+    )
     with st.form(f"{prefix}_create_form", clear_on_submit=True):
         title = st.text_input("제목", key=f"{prefix}_manual_title")
         start_time = st.time_input("시작 시간", value=time(9, 0), key=f"{prefix}_manual_time")
