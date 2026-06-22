@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from personal_assistant.database import ScheduleStore
-from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent
+from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent, TaskPlanItem
 
 
 def test_add_list_update_delete_event(tmp_path) -> None:
@@ -75,3 +75,47 @@ def test_register_user_and_candidates(tmp_path) -> None:
     )
     assert candidate.id is not None
     assert store.list_candidates()[0].title == "창업 지원 사업 모집"
+
+
+def test_task_plan_crud_and_event_delete_cleanup(tmp_path) -> None:
+    store = ScheduleStore(tmp_path / "assistant.db")
+    start_at = datetime.now() + timedelta(days=3)
+    event = store.add_event(
+        ScheduleEvent(
+            id=None,
+            title="지원서 마감",
+            start_at=start_at,
+            end_at=start_at + timedelta(hours=1),
+        )
+    )
+    assert event.id is not None
+
+    items = store.replace_task_plan(
+        event.id,
+        [
+            TaskPlanItem(
+                id=None,
+                event_id=event.id,
+                stage="today",
+                title="공고 확인",
+                due_date=start_at.date(),
+                estimated_minutes=20,
+            ),
+            TaskPlanItem(
+                id=None,
+                event_id=event.id,
+                stage="before_deadline",
+                title="제출 전 점검",
+                due_date=start_at.date(),
+                estimated_minutes=30,
+            ),
+        ],
+    )
+
+    assert [item.title for item in items] == ["공고 확인", "제출 전 점검"]
+    updated = store.update_task_plan_item(int(items[0].id), completed=True)
+    assert updated is not None
+    assert updated.completed is True
+
+    store.delete_event(event.id)
+    assert store.list_task_plan(event.id) == []

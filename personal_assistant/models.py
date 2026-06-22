@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 
 @dataclass
@@ -54,3 +54,25 @@ class ExternalScheduleCandidate:
     status: str = "모집중"
     collected_at: str = ""
     selected: bool = False
+
+
+@dataclass
+class TaskPlanItem:
+    id: int | None
+    event_id: int
+    stage: str
+    title: str
+    due_date: date
+    estimated_minutes: int = 30
+    completed: bool = False
+    source: str = "rule"
+    sort_order: int = 0
+
+    @property
+    def stage_label(self) -> str:
+        labels = {
+            "today": "오늘 할 일",
+            "this_week": "이번주 준비",
+            "before_deadline": "마감전 체크",
+        }
+        return labels.get(self.stage, self.stage)

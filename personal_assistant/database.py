@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
-from .models import AppUser, ExternalScheduleCandidate, ScheduleEvent
+from .models import AppUser, ExternalScheduleCandidate, ScheduleEvent, TaskPlanItem
 
 
 class ScheduleStore:
@@ -65,6 +65,24 @@ class ScheduleStore:
                     status TEXT NOT NULL DEFAULT '모집중',
                     collected_at TEXT NOT NULL,
                     selected INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS task_plan_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id INTEGER NOT NULL,
+                    stage TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    due_date TEXT NOT NULL,
+                    estimated_minutes INTEGER NOT NULL DEFAULT 30,
+                    completed INTEGER NOT NULL DEFAULT 0,
+                    source TEXT NOT NULL DEFAULT 'rule',
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE
                 )
                 """
             )
@@ -183,6 +201,7 @@ class ScheduleStore:
 
     def delete_event(self, event_id: int) -> None:
         with self._connect() as connection:
+            connection.execute("DELETE FROM task_plan_items WHERE event_id = ?", (event_id,))
             connection.execute("DELETE FROM events WHERE id = ?", (event_id,))
 
     def get_event(self, event_id: int) -> ScheduleEvent | None:
@@ -290,6 +309,73 @@ class ScheduleStore:
         with self._connect() as connection:
             connection.execute("UPDATE external_candidates SET selected = 1 WHERE id = ?", (candidate_id,))
 
+    def replace_task_plan(self, event_id: int, items: list[TaskPlanItem]) -> list[TaskPlanItem]:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self._connect() as connection:
+            connection.execute("DELETE FROM task_plan_items WHERE event_id = ?", (event_id,))
+            for index, item in enumerate(items):
+                connection.execute(
+                    """
+                    INSERT INTO task_plan_items (
+                        event_id, stage, title, due_date, estimated_minutes,
+                        completed, source, sort_order, created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        event_id,
+                        item.stage,
+                        item.title.strip(),
+                        item.due_date.isoformat(),
+                        int(item.estimated_minutes),
+                        int(item.completed),
+                        item.source,
+                        index,
+                        now,
+                        now,
+                    ),
+                )
+        return self.list_task_plan(event_id)
+
+    def list_task_plan(self, event_id: int) -> list[TaskPlanItem]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM task_plan_items
+                WHERE event_id = ?
+                ORDER BY sort_order ASC, due_date ASC, id ASC
+                """,
+                (event_id,),
+            ).fetchall()
+        return [self._row_to_task_plan_item(row) for row in rows]
+
+    def update_task_plan_item(self, item_id: int, *, completed: bool | None = None, title: str | None = None) -> TaskPlanItem | None:
+        updates: list[str] = []
+        values: list[object] = []
+        if completed is not None:
+            updates.append("completed = ?")
+            values.append(int(completed))
+        if title is not None:
+            updates.append("title = ?")
+            values.append(title.strip())
+        if not updates:
+            return self.get_task_plan_item(item_id)
+        updates.append("updated_at = ?")
+        values.append(datetime.now().isoformat(timespec="seconds"))
+        values.append(item_id)
+        with self._connect() as connection:
+            connection.execute(f"UPDATE task_plan_items SET {', '.join(updates)} WHERE id = ?", tuple(values))
+        return self.get_task_plan_item(item_id)
+
+    def get_task_plan_item(self, item_id: int) -> TaskPlanItem | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM task_plan_items WHERE id = ?", (item_id,)).fetchone()
+        return self._row_to_task_plan_item(row) if row else None
+
+    def delete_task_plan(self, event_id: int) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM task_plan_items WHERE event_id = ?", (event_id,))
+
     @staticmethod
     def _row_to_event(row: sqlite3.Row) -> ScheduleEvent:
         return ScheduleEvent(
@@ -329,6 +415,20 @@ class ScheduleStore:
             status=str(row["status"]),
             collected_at=str(row["collected_at"]),
             selected=bool(row["selected"]),
+        )
+
+    @staticmethod
+    def _row_to_task_plan_item(row: sqlite3.Row) -> TaskPlanItem:
+        return TaskPlanItem(
+            id=int(row["id"]),
+            event_id=int(row["event_id"]),
+            stage=str(row["stage"]),
+            title=str(row["title"]),
+            due_date=datetime.fromisoformat(str(row["due_date"])).date(),
+            estimated_minutes=int(row["estimated_minutes"]),
+            completed=bool(row["completed"]),
+            source=str(row["source"]),
+            sort_order=int(row["sort_order"]),
         )
 
 

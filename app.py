@@ -12,8 +12,9 @@ import streamlit.components.v1 as components
 from personal_assistant.ai_chat import answer_schedule_question
 from personal_assistant.config import settings
 from personal_assistant.database import ScheduleStore
+from personal_assistant.execution_planner import STAGE_LABELS, generate_task_plan
 from personal_assistant.google_calendar import GoogleCalendarClient
-from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent
+from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent, TaskPlanItem
 from personal_assistant.nlp import CommandParser
 from personal_assistant.priority import recommend_priorities
 from personal_assistant.site_collector import REQUESTED_SITE_SOURCES, collect_interest_sites
@@ -23,7 +24,7 @@ st.set_page_config(page_title="AI Scheduler", page_icon=":calendar:", layout="wi
 
 VIEW_TITLES = {"day": "일 보기", "week": "주 보기", "month": "월 보기"}
 WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
-RIGHT_MENUS = ["상세 정보", "일정 편집", "AI 일정", "Google 연동", "관심 사이트", "우선순위"]
+RIGHT_MENUS = ["상세 정보", "실행 계획", "일정 편집", "AI 일정", "Google 연동", "관심 사이트", "우선순위"]
 
 
 @st.cache_resource
@@ -633,7 +634,7 @@ def create_event(event: ScheduleEvent) -> ScheduleEvent:
     if sync.google_event_id:
         event.google_event_id = sync.google_event_id
         event.sync_status = "synced"
-        if not event.source_url:
+        if not event.source_url and event.source == "local":
             event.source = "google_calendar"
     saved = store.add_event(event)
     st.session_state.sync_message = sync.message
@@ -1050,6 +1051,8 @@ def render_right_content(events: list[ScheduleEvent], menu: str) -> None:
     if menu == "상세 정보":
         render_selected_detail(events)
         render_chat_history()
+    elif menu == "실행 계획":
+        render_execution_planner(events)
     elif menu == "일정 편집":
         render_event_editor(events)
     elif menu == "AI 일정":
@@ -1083,6 +1086,97 @@ def render_selected_detail(events: list[ScheduleEvent]) -> None:
         )
         if event.source_url:
             st.link_button("원문 URL 열기", event.source_url, use_container_width=True)
+        if event.id is not None and st.button("실행 계획 생성/보기", key=f"detail_plan_{event.id}", use_container_width=True):
+            existing = store.list_task_plan(int(event.id))
+            if not existing:
+                store.replace_task_plan(int(event.id), generate_task_plan(event))
+            st.session_state.right_menu = "실행 계획"
+            st.rerun()
+
+
+def render_execution_planner(events: list[ScheduleEvent]) -> None:
+    selected = st.session_state.selected_date
+    day_events = events_for_day(events, selected)
+    st.markdown(f"<h3 class='panel-section-title'>{selected:%Y-%m-%d} 실행 계획</h3>", unsafe_allow_html=True)
+    if not day_events:
+        st.caption("선택된 날짜에 실행 계획을 만들 일정이 없습니다.")
+        return
+
+    event_options = {int(event.id): event for event in day_events if event.id is not None}
+    option_ids = list(event_options)
+    default_id = st.session_state.get("execution_plan_event_id")
+    if default_id not in event_options:
+        default_id = option_ids[0]
+    selected_event_id = st.selectbox(
+        "계획을 만들 일정",
+        option_ids,
+        index=option_ids.index(default_id),
+        format_func=lambda event_id: event_options[event_id].title,
+    )
+    st.session_state.execution_plan_event_id = selected_event_id
+    event = event_options[int(selected_event_id)]
+
+    generate_col, clear_col = st.columns(2)
+    if generate_col.button("AI 실행 계획 생성", type="primary", use_container_width=True):
+        items = store.replace_task_plan(int(event.id), generate_task_plan(event))
+        st.success(f"{len(items)}개 실행 항목을 생성했습니다.")
+        st.rerun()
+    if clear_col.button("계획 삭제", use_container_width=True):
+        store.delete_task_plan(int(event.id))
+        st.rerun()
+
+    items = store.list_task_plan(int(event.id))
+    if not items:
+        st.info("아직 실행 계획이 없습니다. `AI 실행 계획 생성`을 눌러 오늘/이번주/마감전 작업으로 분해하세요.")
+        return
+
+    completed = sum(1 for item in items if item.completed)
+    st.caption(f"진행률 {completed}/{len(items)} · 원 일정: {event.date_label} {event.time_label}")
+    tabs = st.tabs([STAGE_LABELS[stage] for stage in STAGE_LABELS])
+    for tab, stage in zip(tabs, STAGE_LABELS):
+        with tab:
+            stage_items = [item for item in items if item.stage == stage]
+            if not stage_items:
+                st.caption("해당 단계의 작업이 없습니다.")
+                continue
+            for item in stage_items:
+                render_task_plan_item(event, item, events)
+
+
+def render_task_plan_item(event: ScheduleEvent, item: TaskPlanItem, events: list[ScheduleEvent]) -> None:
+    with st.container(border=True):
+        checked = st.checkbox(
+            item.title,
+            value=item.completed,
+            key=f"task_plan_done_{item.id}",
+        )
+        if checked != item.completed and item.id is not None:
+            store.update_task_plan_item(int(item.id), completed=checked)
+            st.rerun()
+        st.caption(f"기한 {item.due_date:%Y-%m-%d} · 예상 {item.estimated_minutes}분 · 생성 {item.source}")
+        already_exists = any(
+            existing.source == "task_plan"
+            and existing.start_at.date() == item.due_date
+            and existing.title == f"[작업] {item.title}"
+            for existing in events
+        )
+        if already_exists:
+            st.caption("이미 캘린더 일정으로 반영됨")
+        elif st.button("캘린더 일정으로 반영", key=f"task_plan_event_{item.id}", use_container_width=True):
+            start_at = datetime.combine(item.due_date, time(9, 0))
+            create_event(
+                ScheduleEvent(
+                    id=None,
+                    title=f"[작업] {item.title}",
+                    start_at=start_at,
+                    end_at=start_at + timedelta(minutes=item.estimated_minutes),
+                    description=f"실행 계획 항목\n원 일정: {event.title}\n원 일정일: {event.date_label}",
+                    importance=max(event.importance, 3),
+                    source="task_plan",
+                    sync_status="local",
+                )
+            )
+            st.rerun()
 
 
 def render_chat_history() -> None:
