@@ -369,6 +369,29 @@ def inject_styles() -> None:
             font-weight: 520;
             margin-bottom: 6px;
         }
+        div[class*="st-key-month_day_"] button,
+        div[class*="st-key-week_day_"] button {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            color: var(--text) !important;
+            min-height: 22px !important;
+            padding: 0 !important;
+            font-size: .86rem !important;
+            font-weight: 520 !important;
+        }
+        div[class*="st-key-month_day_"] button:hover,
+        div[class*="st-key-week_day_"] button:hover {
+            background: transparent !important;
+            color: var(--primary) !important;
+            border: 0 !important;
+        }
+        div[class*="st-key-month_day_"] button:disabled {
+            background: transparent !important;
+            border: 0 !important;
+            color: var(--muted) !important;
+            opacity: .45 !important;
+        }
         .event-pill {
             display: block;
             margin-top: 5px;
@@ -973,7 +996,7 @@ def render_month(events: list[ScheduleEvent], selected: date) -> None:
             label = f"{day.day}"
             if day == date.today():
                 label = f"{day.day} 오늘"
-            with col.container(height=112, border=True):
+            with col.container(height=112, border=False):
                 if st.button(
                     label,
                     key=f"month_day_{day.isoformat()}",
