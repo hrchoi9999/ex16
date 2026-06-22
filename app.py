@@ -79,6 +79,7 @@ def init_state() -> None:
     st.session_state.setdefault("risk_message", "")
     st.session_state.setdefault("briefing_message", "")
     st.session_state.setdefault("chat_history", [])
+    st.session_state.setdefault("chat_focus_mode", False)
     st.session_state.setdefault("highlight_event_ids", [])
     st.session_state.setdefault("show_day_dialog", False)
     st.session_state.setdefault("last_site_collection_at", None)
@@ -1454,6 +1455,7 @@ def render_right(events: list[ScheduleEvent]) -> None:
         "<div class='right-title' style='font-size:20px !important;line-height:1.15 !important;'>작업 메뉴</div>",
         unsafe_allow_html=True,
     )
+    previous_menu = st.session_state.right_menu
     menu = st.radio(
         "메뉴 선택",
         RIGHT_MENUS,
@@ -1461,6 +1463,8 @@ def render_right(events: list[ScheduleEvent]) -> None:
         horizontal=True,
         label_visibility="collapsed",
     )
+    if menu != previous_menu:
+        st.session_state.chat_focus_mode = False
     st.session_state.right_menu = menu
     if menu != "일정 편집" and st.session_state.show_day_dialog:
         st.session_state.show_day_dialog = False
@@ -1474,9 +1478,11 @@ def render_right(events: list[ScheduleEvent]) -> None:
 
 
 def render_right_content(events: list[ScheduleEvent], menu: str) -> None:
+    if st.session_state.chat_focus_mode:
+        render_chat_focus_panel()
+        return
     if menu == "상세 정보":
         render_selected_detail(events)
-        render_chat_history()
     elif menu == "브리핑":
         render_context_briefing(events)
     elif menu == "실행 계획":
@@ -1487,13 +1493,22 @@ def render_right_content(events: list[ScheduleEvent], menu: str) -> None:
         render_event_editor(events)
     elif menu == "AI 일정":
         render_ai_event_creator()
-        render_chat_history()
     elif menu == "Google 연동":
         render_google_tools()
     elif menu == "관심 사이트":
         render_candidates()
     elif menu == "우선순위":
         render_recommendations(events)
+
+
+def render_chat_focus_panel() -> None:
+    st.markdown("<h3 class='panel-section-title'>AI 채팅</h3>", unsafe_allow_html=True)
+    if st.button("선택 날짜 상세로 돌아가기", use_container_width=True):
+        st.session_state.chat_focus_mode = False
+        st.session_state.right_menu = "상세 정보"
+        sync_query_params_from_state()
+        st.rerun()
+    render_chat_history()
 
 
 def render_selected_detail(events: list[ScheduleEvent]) -> None:
@@ -1964,7 +1979,8 @@ def render_recommendations(events: list[ScheduleEvent]) -> None:
 
 
 def render_ai_chat_input(events: list[ScheduleEvent]) -> None:
-    render_compact_chat_history()
+    if not st.session_state.chat_focus_mode:
+        render_compact_chat_history()
     with st.form("ai_chat_form", clear_on_submit=True, border=True):
         st.markdown("**AI 채팅**")
         chat_col, send_col = st.columns([0.78, 0.22], gap="small")
@@ -1977,6 +1993,7 @@ def render_ai_chat_input(events: list[ScheduleEvent]) -> None:
         submitted = send_col.form_submit_button("전송", type="primary", use_container_width=True)
         if submitted:
             handle_ai_chat_command(question, events)
+            st.session_state.chat_focus_mode = True
             sync_query_params_from_state()
             st.session_state.sync_message = "AI 채팅 명령을 처리했습니다."
             st.rerun()
