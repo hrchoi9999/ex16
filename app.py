@@ -91,6 +91,10 @@ def init_state() -> None:
     if query_dialog == "1":
         st.session_state.show_day_dialog = True
         st.session_state.right_menu = "일정 편집"
+        if "dialog" in st.query_params:
+            del st.query_params["dialog"]
+    elif query_menu in RIGHT_MENUS and query_menu != "일정 편집":
+        st.session_state.show_day_dialog = False
 
 
 def handle_google_oauth_callback() -> None:
@@ -565,7 +569,7 @@ def calendar_href(target_date: date, view_mode: str, dialog: bool = False) -> st
     params = {
         "view": view_mode,
         "date": target_date.isoformat(),
-        "menu": st.session_state.get("right_menu", "상세 정보"),
+        "menu": "일정 편집" if dialog else st.session_state.get("right_menu", "상세 정보"),
     }
     if dialog:
         params["dialog"] = "1"
@@ -723,7 +727,7 @@ def render_left(events: list[ScheduleEvent]) -> None:
         <div class="brand">
             <div class="brand-icon">AI</div>
             <div>
-                <p class="brand-title" style="font-size:2rem !important;font-weight:900 !important;color:var(--primary) !important;">개인 일정 관리</p>
+                <span class="brand-title" style="display:block;font-size:32px !important;line-height:1.05 !important;font-weight:900 !important;color:#2563eb !important;">개인 일정 관리</span>
             </div>
         </div>
         """,
@@ -914,7 +918,7 @@ def render_center(events: list[ScheduleEvent]) -> None:
             <div class="calendar-title-group">
                 <a class="nav-square" href="{calendar_href(previous_date, view_mode)}">‹</a>
                 <div class="calendar-heading">
-                    <h2 class="calendar-title" style="font-size:.80rem !important;">{escape(title)}</h2>
+                    <span class="calendar-title" style="display:block;font-size:13px !important;line-height:1.15 !important;font-weight:760 !important;color:#0f172a !important;">{escape(title)}</span>
                     <p class="calendar-subtitle">{VIEW_TITLES[view_mode]} · 일정 {len(visible_events)}개</p>
                 </div>
                 <a class="nav-square" href="{calendar_href(next_date, view_mode)}">›</a>
