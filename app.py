@@ -375,12 +375,21 @@ def inject_styles() -> None:
             border: 0 !important;
             box-shadow: none !important;
             color: var(--text) !important;
+            display: block !important;
             justify-content: flex-start !important;
             min-height: 18px !important;
             padding: 0 !important;
             text-align: left !important;
             font-size: .82rem !important;
             font-weight: 520 !important;
+        }
+        div[class*="st-key-month_day_"] div[data-testid="stButton"],
+        div[class*="st-key-month_day_"] div[data-testid="stButton"] > button,
+        div[class*="st-key-month_day_"] button > div,
+        div[class*="st-key-month_day_"] div[data-testid="stMarkdownContainer"] {
+            justify-content: flex-start !important;
+            text-align: left !important;
+            width: 100% !important;
         }
         div[class*="st-key-month_day_"] button p,
         div[class*="st-key-month_day_"] button span {
