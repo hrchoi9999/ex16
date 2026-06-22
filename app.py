@@ -247,7 +247,7 @@ def inject_styles() -> None:
         .brand-title {
             margin: 0;
             color: var(--primary);
-            font-size: 1.2rem;
+            font-size: 2rem;
             font-weight: 900;
         }
         .section-label {
@@ -297,7 +297,7 @@ def inject_styles() -> None:
         }
         .calendar-title {
             margin: 0;
-            font-size: .98rem;
+            font-size: .80rem;
             font-weight: 760;
         }
         .calendar-subtitle {
