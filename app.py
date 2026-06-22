@@ -325,6 +325,26 @@ def inject_styles() -> None:
             font-size: 1.35rem;
             font-weight: 900;
         }
+        div[class*="st-key-nav_prev"] button,
+        div[class*="st-key-nav_next"] button {
+            width: 36px !important;
+            min-width: 36px !important;
+            height: 36px !important;
+            min-height: 36px !important;
+            padding: 0 !important;
+            border: 1px solid var(--line) !important;
+            border-radius: 8px !important;
+            background: #fff !important;
+            color: var(--text) !important;
+            font-size: 1.35rem !important;
+            font-weight: 900 !important;
+            line-height: 1 !important;
+        }
+        div[class*="st-key-nav_prev"] button:hover,
+        div[class*="st-key-nav_next"] button:hover {
+            border-color: var(--primary) !important;
+            color: var(--primary) !important;
+        }
         .month-grid {
             display: grid;
             grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -654,6 +674,17 @@ def select_calendar_day(target_date: date, view_mode: str, has_events: bool) -> 
         st.session_state.right_menu = "일정 편집"
         st.query_params["menu"] = "일정 편집"
         st.query_params["dialog"] = "1"
+
+
+def navigate_calendar(target_date: date, view_mode: str) -> None:
+    st.session_state.selected_date = target_date
+    st.session_state.view_mode = view_mode
+    st.session_state.show_day_dialog = False
+    st.query_params["view"] = view_mode
+    st.query_params["date"] = target_date.isoformat()
+    st.query_params["menu"] = st.session_state.get("right_menu", "상세 정보")
+    if "dialog" in st.query_params:
+        del st.query_params["dialog"]
 
 
 def shifted_date(selected: date, view_mode: str, direction: int) -> date:
@@ -992,20 +1023,27 @@ def render_center(events: list[ScheduleEvent]) -> None:
     )
     previous_date = shifted_date(selected, view_mode, -1)
     next_date = shifted_date(selected, view_mode, 1)
-    st.markdown(
+    nav_prev, nav_title, nav_next, _spacer = st.columns([0.05, 0.18, 0.05, 0.72], gap="small")
+    nav_prev.button(
+        "‹",
+        key=f"nav_prev_{view_mode}_{selected.isoformat()}",
+        on_click=navigate_calendar,
+        args=(previous_date, view_mode),
+    )
+    nav_title.markdown(
         f"""
-        <div class="calendar-nav">
-            <div class="calendar-title-group">
-                <a class="nav-square" href="{calendar_href(previous_date, view_mode)}">‹</a>
-                <div class="calendar-heading">
-                    <span class="calendar-title" style="display:block;font-size:24px !important;line-height:1.12 !important;font-weight:760 !important;color:#0f172a !important;">{escape(title)}</span>
-                    <p class="calendar-subtitle">{VIEW_TITLES[view_mode]} · 일정 {len(visible_events)}개</p>
-                </div>
-                <a class="nav-square" href="{calendar_href(next_date, view_mode)}">›</a>
-            </div>
+        <div class="calendar-heading">
+            <span class="calendar-title" style="display:block;font-size:24px !important;line-height:1.12 !important;font-weight:760 !important;color:#0f172a !important;">{escape(title)}</span>
+            <p class="calendar-subtitle">{VIEW_TITLES[view_mode]} · 일정 {len(visible_events)}개</p>
         </div>
         """,
         unsafe_allow_html=True,
+    )
+    nav_next.button(
+        "›",
+        key=f"nav_next_{view_mode}_{selected.isoformat()}",
+        on_click=navigate_calendar,
+        args=(next_date, view_mode),
     )
     if view_mode == "month":
         render_month(events, selected)
