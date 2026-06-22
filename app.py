@@ -633,12 +633,13 @@ def parse_period(period: str) -> tuple[date, date]:
 
 def candidate_to_event(candidate: ExternalScheduleCandidate) -> ScheduleEvent:
     start_day, end_day = parse_period(candidate.recruitment_period)
+    deadline = end_day
     return ScheduleEvent(
         id=None,
-        title=candidate.title,
-        start_at=datetime.combine(start_day, time(9, 0)),
-        end_at=datetime.combine(end_day, time(18, 0)),
-        description=f"{candidate.source} {candidate.category}\n모집기간: {candidate.recruitment_period}\nURL: {candidate.url}",
+        title=f"[마감] {candidate.title}",
+        start_at=datetime.combine(deadline, time(9, 0)),
+        end_at=datetime.combine(deadline, time(18, 0)),
+        description=f"{candidate.source} {candidate.category}\n마감일: {deadline:%Y-%m-%d}\n모집기간: {candidate.recruitment_period}\nURL: {candidate.url}",
         location=candidate.source,
         importance=4,
         source=candidate.source,
@@ -1008,6 +1009,8 @@ def render_selected_detail(events: list[ScheduleEvent]) -> None:
             """,
             unsafe_allow_html=True,
         )
+        if event.source_url:
+            st.link_button("원문 URL 열기", event.source_url, use_container_width=True)
 
 
 def render_chat_history() -> None:
@@ -1175,11 +1178,11 @@ def render_candidates() -> None:
         st.markdown(f"**{candidate.title}**")
         st.caption(f"{candidate.source} · {candidate.category} · {candidate.recruitment_period}")
         st.link_button("원문 열기", candidate.url, use_container_width=True)
-        if st.button("이 공고를 일정에 등록", key=f"candidate_{candidate.id}", use_container_width=True):
+        if st.button("마감일 기준 일정 등록", key=f"candidate_{candidate.id}", use_container_width=True):
             event = candidate_to_event(candidate)
             create_event(event)
             store.mark_candidate_selected(int(candidate.id))
-            st.success("선택한 공고를 일정에 등록했습니다.")
+            st.success("선택한 공고를 마감일 기준 일정으로 등록했습니다.")
             st.rerun()
 
 
