@@ -96,3 +96,15 @@ class RiskAssessment:
             "danger": "위험",
         }
         return labels.get(self.risk_level, self.risk_level)
+
+
+@dataclass
+class BriefingSnapshot:
+    id: int | None
+    scope_key: str
+    scope_label: str
+    summary: str
+    highlights: list[str] = field(default_factory=list)
+    related_event_ids: list[int] = field(default_factory=list)
+    source_links: list[str] = field(default_factory=list)
+    generated_at: str = ""

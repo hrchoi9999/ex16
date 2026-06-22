@@ -10,6 +10,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from personal_assistant.ai_chat import answer_schedule_question
+from personal_assistant.briefing import generate_briefing
 from personal_assistant.config import settings
 from personal_assistant.database import ScheduleStore
 from personal_assistant.execution_planner import STAGE_LABELS, generate_task_plan
@@ -25,7 +26,7 @@ st.set_page_config(page_title="AI Scheduler", page_icon=":calendar:", layout="wi
 
 VIEW_TITLES = {"day": "일 보기", "week": "주 보기", "month": "월 보기"}
 WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
-RIGHT_MENUS = ["상세 정보", "실행 계획", "리스크 코치", "일정 편집", "AI 일정", "Google 연동", "관심 사이트", "우선순위"]
+RIGHT_MENUS = ["상세 정보", "브리핑", "실행 계획", "리스크 코치", "일정 편집", "AI 일정", "Google 연동", "관심 사이트", "우선순위"]
 
 
 @st.cache_resource
@@ -67,6 +68,7 @@ def init_state() -> None:
     st.session_state.setdefault("sync_message", "")
     st.session_state.setdefault("site_message", "")
     st.session_state.setdefault("risk_message", "")
+    st.session_state.setdefault("briefing_message", "")
     st.session_state.setdefault("chat_history", [])
     st.session_state.setdefault("highlight_event_ids", [])
     st.session_state.setdefault("show_day_dialog", False)
@@ -835,6 +837,49 @@ def scan_and_store_risks(events: list[ScheduleEvent]) -> None:
     st.session_state.risk_message = f"{len(assessments)}개 일정을 스캔했습니다. 위험 {danger_count}개, 주의 {caution_count}개입니다."
 
 
+def create_and_store_briefing(events: list[ScheduleEvent], scope: str) -> None:
+    selected = st.session_state.selected_date
+    if scope == "week":
+        start = week_start(selected)
+        end = start + timedelta(days=7)
+        scope_key = f"week:{start.isoformat()}"
+        scope_label = f"{start:%Y-%m-%d}~{(end - timedelta(days=1)):%Y-%m-%d}"
+    else:
+        start = selected
+        end = selected + timedelta(days=1)
+        scope_key = f"day:{selected.isoformat()}"
+        scope_label = f"{selected:%Y-%m-%d}"
+
+    scoped_events = [
+        event
+        for event in events
+        if event.id is not None and start <= event.start_at.date() < end
+    ]
+    scan_and_store_risks(events)
+    risk_by_event = {assessment.event_id: assessment for assessment in store.list_risk_assessments()}
+    task_plan_by_event = {
+        int(event.id): store.list_task_plan(int(event.id))
+        for event in scoped_events
+        if event.id is not None
+    }
+    snapshot = generate_briefing(
+        scope_key=scope_key,
+        scope_label=scope_label,
+        events=scoped_events,
+        task_plan_by_event=task_plan_by_event,
+        risk_by_event=risk_by_event,
+    )
+    saved = store.upsert_briefing_snapshot(snapshot)
+    st.session_state.briefing_message = f"{saved.scope_label} 브리핑을 생성했습니다."
+
+
+def briefing_scope_key(scope: str) -> str:
+    selected = st.session_state.selected_date
+    if scope == "week":
+        return f"week:{week_start(selected).isoformat()}"
+    return f"day:{selected.isoformat()}"
+
+
 def parse_period(period: str) -> tuple[date, date]:
     matches = re.findall(r"(20\d{2})[.년/-]\s*(\d{1,2})[.월/-]\s*(\d{1,2})", period)
     if matches:
@@ -1248,6 +1293,8 @@ def render_right_content(events: list[ScheduleEvent], menu: str) -> None:
     if menu == "상세 정보":
         render_selected_detail(events)
         render_chat_history()
+    elif menu == "브리핑":
+        render_context_briefing(events)
     elif menu == "실행 계획":
         render_execution_planner(events)
     elif menu == "리스크 코치":
@@ -1432,6 +1479,58 @@ def render_risk_card(event: ScheduleEvent, assessment, events: list[ScheduleEven
                 st.session_state.selected_date = event.start_at.date()
                 st.session_state.right_menu = "실행 계획"
                 st.rerun()
+
+
+def render_context_briefing(events: list[ScheduleEvent]) -> None:
+    st.markdown("<h3 class='panel-section-title'>맥락 기반 일정 브리핑</h3>", unsafe_allow_html=True)
+    scope = st.radio(
+        "브리핑 범위",
+        ["day", "week"],
+        format_func=lambda value: "선택일" if value == "day" else "이번 주",
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    if st.button("브리핑 생성/갱신", type="primary", use_container_width=True):
+        create_and_store_briefing(events, scope)
+        st.rerun()
+    if st.session_state.briefing_message:
+        st.info(st.session_state.briefing_message)
+
+    snapshot = store.get_briefing_snapshot(briefing_scope_key(scope))
+    if snapshot is None:
+        st.caption("아직 생성된 브리핑이 없습니다. `브리핑 생성/갱신`을 실행하세요.")
+        recent = store.list_briefing_snapshots()[:3]
+        if recent:
+            st.caption("최근 브리핑")
+            for item in recent:
+                st.markdown(f"- {item.scope_label} · {item.generated_at}")
+        return
+
+    st.markdown(f"**{snapshot.scope_label} 브리핑**")
+    st.caption(f"생성 시각 {snapshot.generated_at}")
+    st.info(snapshot.summary)
+    st.markdown("**핵심 포인트**")
+    for highlight in snapshot.highlights:
+        st.markdown(f"- {highlight}")
+
+    event_by_id = {int(event.id): event for event in events if event.id is not None}
+    related_events = [event_by_id[event_id] for event_id in snapshot.related_event_ids if event_id in event_by_id]
+    if related_events:
+        st.markdown("**관련 일정**")
+        for event in related_events[:6]:
+            risk = store.get_risk_assessment(int(event.id)) if event.id is not None else None
+            risk_text = f" · {risk.level_label} {risk.risk_score}" if risk else ""
+            st.caption(f"{event.date_label} {event.time_label} · {event.title}{risk_text}")
+            if event.source_url:
+                st.link_button("원문 URL 열기", event.source_url, key=f"brief_link_{event.id}", use_container_width=True)
+
+    action_col, risk_col = st.columns(2)
+    if action_col.button("실행 계획으로 이동", use_container_width=True):
+        st.session_state.right_menu = "실행 계획"
+        st.rerun()
+    if risk_col.button("리스크 코치로 이동", use_container_width=True):
+        st.session_state.right_menu = "리스크 코치"
+        st.rerun()
 
 
 def render_chat_history() -> None:

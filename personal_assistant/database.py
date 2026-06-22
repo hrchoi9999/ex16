@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
-from .models import AppUser, ExternalScheduleCandidate, RiskAssessment, ScheduleEvent, TaskPlanItem
+from .models import AppUser, BriefingSnapshot, ExternalScheduleCandidate, RiskAssessment, ScheduleEvent, TaskPlanItem
 
 
 class ScheduleStore:
@@ -98,6 +98,20 @@ class ScheduleStore:
                     next_action TEXT NOT NULL DEFAULT '',
                     assessed_at TEXT NOT NULL,
                     FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS briefing_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    scope_key TEXT NOT NULL UNIQUE,
+                    scope_label TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    highlights TEXT NOT NULL,
+                    related_event_ids TEXT NOT NULL,
+                    source_links TEXT NOT NULL,
+                    generated_at TEXT NOT NULL
                 )
                 """
             )
@@ -435,6 +449,52 @@ class ScheduleStore:
             row = connection.execute("SELECT * FROM risk_assessments WHERE event_id = ?", (event_id,)).fetchone()
         return self._row_to_risk_assessment(row) if row else None
 
+    def upsert_briefing_snapshot(self, snapshot: BriefingSnapshot) -> BriefingSnapshot:
+        generated_at = snapshot.generated_at or datetime.now().isoformat(timespec="seconds")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO briefing_snapshots (
+                    scope_key, scope_label, summary, highlights,
+                    related_event_ids, source_links, generated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(scope_key) DO UPDATE SET
+                    scope_label = excluded.scope_label,
+                    summary = excluded.summary,
+                    highlights = excluded.highlights,
+                    related_event_ids = excluded.related_event_ids,
+                    source_links = excluded.source_links,
+                    generated_at = excluded.generated_at
+                """,
+                (
+                    snapshot.scope_key,
+                    snapshot.scope_label,
+                    snapshot.summary,
+                    json.dumps(snapshot.highlights, ensure_ascii=False),
+                    json.dumps(snapshot.related_event_ids),
+                    json.dumps(snapshot.source_links, ensure_ascii=False),
+                    generated_at,
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM briefing_snapshots WHERE scope_key = ?",
+                (snapshot.scope_key,),
+            ).fetchone()
+        return self._row_to_briefing_snapshot(row)
+
+    def get_briefing_snapshot(self, scope_key: str) -> BriefingSnapshot | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM briefing_snapshots WHERE scope_key = ?", (scope_key,)).fetchone()
+        return self._row_to_briefing_snapshot(row) if row else None
+
+    def list_briefing_snapshots(self) -> list[BriefingSnapshot]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM briefing_snapshots ORDER BY generated_at DESC, id DESC"
+            ).fetchall()
+        return [self._row_to_briefing_snapshot(row) for row in rows]
+
     @staticmethod
     def _row_to_event(row: sqlite3.Row) -> ScheduleEvent:
         return ScheduleEvent(
@@ -504,6 +564,31 @@ class ScheduleStore:
             risk_factors=[str(factor) for factor in factors],
             next_action=str(row["next_action"]),
             assessed_at=str(row["assessed_at"]),
+        )
+
+    @staticmethod
+    def _row_to_briefing_snapshot(row: sqlite3.Row) -> BriefingSnapshot:
+        try:
+            highlights = json.loads(str(row["highlights"]))
+        except json.JSONDecodeError:
+            highlights = []
+        try:
+            related_event_ids = json.loads(str(row["related_event_ids"]))
+        except json.JSONDecodeError:
+            related_event_ids = []
+        try:
+            source_links = json.loads(str(row["source_links"]))
+        except json.JSONDecodeError:
+            source_links = []
+        return BriefingSnapshot(
+            id=int(row["id"]),
+            scope_key=str(row["scope_key"]),
+            scope_label=str(row["scope_label"]),
+            summary=str(row["summary"]),
+            highlights=[str(item) for item in highlights],
+            related_event_ids=[int(item) for item in related_event_ids],
+            source_links=[str(item) for item in source_links],
+            generated_at=str(row["generated_at"]),
         )
 
 

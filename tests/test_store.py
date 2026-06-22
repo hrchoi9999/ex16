@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from personal_assistant.database import ScheduleStore
-from personal_assistant.models import ExternalScheduleCandidate, RiskAssessment, ScheduleEvent, TaskPlanItem
+from personal_assistant.models import BriefingSnapshot, ExternalScheduleCandidate, RiskAssessment, ScheduleEvent, TaskPlanItem
 
 
 def test_add_list_update_delete_event(tmp_path) -> None:
@@ -151,3 +151,22 @@ def test_risk_assessment_upsert_and_event_delete_cleanup(tmp_path) -> None:
 
     store.delete_event(event.id)
     assert store.get_risk_assessment(event.id) is None
+
+
+def test_briefing_snapshot_upsert(tmp_path) -> None:
+    store = ScheduleStore(tmp_path / "assistant.db")
+    saved = store.upsert_briefing_snapshot(
+        BriefingSnapshot(
+            id=None,
+            scope_key="day:2026-06-22",
+            scope_label="2026-06-22",
+            summary="오늘 일정 2개가 있습니다.",
+            highlights=["마감 일정 확인"],
+            related_event_ids=[1, 2],
+            source_links=["https://example.com"],
+        )
+    )
+
+    assert saved.id is not None
+    assert saved.highlights == ["마감 일정 확인"]
+    assert store.get_briefing_snapshot("day:2026-06-22").source_links == ["https://example.com"]
