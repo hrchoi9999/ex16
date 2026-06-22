@@ -34,6 +34,22 @@ class Settings:
 
     site_collection_interval_hours: int = int(os.getenv("SITE_COLLECTION_INTERVAL_HOURS", "3"))
     seoul50plus_url: str = os.getenv("SEOUL50PLUS_URL", "https://www.50plus.or.kr/")
+    seoul50plus_vocational_training_url: str = os.getenv(
+        "SEOUL50PLUS_VOCATIONAL_TRAINING_URL",
+        "https://www.50plus.or.kr/vocationalTraining.do",
+    )
+    seoul50plus_ai_digital_url: str = os.getenv(
+        "SEOUL50PLUS_AI_DIGITAL_URL",
+        "https://www.50plus.or.kr/aiDigital.do",
+    )
+    seoul50plus_ai_digital_list_url: str = os.getenv(
+        "SEOUL50PLUS_AI_DIGITAL_LIST_URL",
+        "https://www.50plus.or.kr/education.do?cost=ALL&state=ALL&term=AI&type=KEYWORD",
+    )
+    seoul50plus_private_job_url: str = os.getenv(
+        "SEOUL50PLUS_PRIVATE_JOB_URL",
+        "https://www.50plus.or.kr/in_appList.do?bizSeUrl=IN49008&rcrtSeUrl=IN47002",
+    )
     seoul50plus_training_url: str = os.getenv(
         "SEOUL50PLUS_TRAINING_URL",
         "https://www.50plus.or.kr/in_appList.do?bizSeUrl=IN49009&rcrtSeUrl=IN47002",
@@ -43,6 +59,9 @@ class Settings:
         "https://www.50plus.or.kr/in_appList.do?bizSeUrl=IN49001&rcrtSeUrl=IN47002",
     )
     kstartup_url: str = os.getenv("KSTARTUP_URL", "https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do")
+    sba_notice_url: str = os.getenv("SBA_NOTICE_URL", "https://seoul.rnbd.kr/client/c030100/c030100_00.jsp")
+    seoul_ccei_notice_url: str = os.getenv("SEOUL_CCEI_NOTICE_URL", "https://ccei.creativekorea.or.kr/seoul/main.do")
+    seoul_ccei_oi_url: str = os.getenv("SEOUL_CCEI_OI_URL", "https://scceioi.kr/")
 
     @property
     def google_calendar_enabled(self) -> bool:
