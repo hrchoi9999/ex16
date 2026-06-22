@@ -382,6 +382,11 @@ def inject_styles() -> None:
             font-size: .82rem !important;
             font-weight: 520 !important;
         }
+        div[class*="st-key-month_day_"] button p,
+        div[class*="st-key-month_day_"] button span {
+            width: 100% !important;
+            text-align: left !important;
+        }
         div[class*="st-key-month_day_"] button:hover,
         div[class*="st-key-week_day_"] button:hover {
             background: transparent !important;
