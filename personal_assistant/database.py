@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import sqlite3
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
-from .models import AppUser, ExternalScheduleCandidate, ScheduleEvent, TaskPlanItem
+from .models import AppUser, ExternalScheduleCandidate, RiskAssessment, ScheduleEvent, TaskPlanItem
 
 
 class ScheduleStore:
@@ -82,6 +83,20 @@ class ScheduleStore:
                     sort_order INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
+                    FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS risk_assessments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id INTEGER NOT NULL UNIQUE,
+                    risk_score INTEGER NOT NULL,
+                    risk_level TEXT NOT NULL,
+                    risk_factors TEXT NOT NULL,
+                    next_action TEXT NOT NULL DEFAULT '',
+                    assessed_at TEXT NOT NULL,
                     FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE
                 )
                 """
@@ -202,6 +217,7 @@ class ScheduleStore:
     def delete_event(self, event_id: int) -> None:
         with self._connect() as connection:
             connection.execute("DELETE FROM task_plan_items WHERE event_id = ?", (event_id,))
+            connection.execute("DELETE FROM risk_assessments WHERE event_id = ?", (event_id,))
             connection.execute("DELETE FROM events WHERE id = ?", (event_id,))
 
     def get_event(self, event_id: int) -> ScheduleEvent | None:
@@ -376,6 +392,49 @@ class ScheduleStore:
         with self._connect() as connection:
             connection.execute("DELETE FROM task_plan_items WHERE event_id = ?", (event_id,))
 
+    def upsert_risk_assessment(self, assessment: RiskAssessment) -> RiskAssessment:
+        assessed_at = assessment.assessed_at or datetime.now().isoformat(timespec="seconds")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO risk_assessments (
+                    event_id, risk_score, risk_level, risk_factors, next_action, assessed_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(event_id) DO UPDATE SET
+                    risk_score = excluded.risk_score,
+                    risk_level = excluded.risk_level,
+                    risk_factors = excluded.risk_factors,
+                    next_action = excluded.next_action,
+                    assessed_at = excluded.assessed_at
+                """,
+                (
+                    assessment.event_id,
+                    int(assessment.risk_score),
+                    assessment.risk_level,
+                    json.dumps(assessment.risk_factors, ensure_ascii=False),
+                    assessment.next_action,
+                    assessed_at,
+                ),
+            )
+            row = connection.execute("SELECT * FROM risk_assessments WHERE event_id = ?", (assessment.event_id,)).fetchone()
+        return self._row_to_risk_assessment(row)
+
+    def list_risk_assessments(self) -> list[RiskAssessment]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM risk_assessments
+                ORDER BY risk_score DESC, assessed_at DESC
+                """
+            ).fetchall()
+        return [self._row_to_risk_assessment(row) for row in rows]
+
+    def get_risk_assessment(self, event_id: int) -> RiskAssessment | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM risk_assessments WHERE event_id = ?", (event_id,)).fetchone()
+        return self._row_to_risk_assessment(row) if row else None
+
     @staticmethod
     def _row_to_event(row: sqlite3.Row) -> ScheduleEvent:
         return ScheduleEvent(
@@ -429,6 +488,22 @@ class ScheduleStore:
             completed=bool(row["completed"]),
             source=str(row["source"]),
             sort_order=int(row["sort_order"]),
+        )
+
+    @staticmethod
+    def _row_to_risk_assessment(row: sqlite3.Row) -> RiskAssessment:
+        try:
+            factors = json.loads(str(row["risk_factors"]))
+        except json.JSONDecodeError:
+            factors = [str(row["risk_factors"])]
+        return RiskAssessment(
+            id=int(row["id"]),
+            event_id=int(row["event_id"]),
+            risk_score=int(row["risk_score"]),
+            risk_level=str(row["risk_level"]),
+            risk_factors=[str(factor) for factor in factors],
+            next_action=str(row["next_action"]),
+            assessed_at=str(row["assessed_at"]),
         )
 
 

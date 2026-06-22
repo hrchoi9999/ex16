@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from personal_assistant.database import ScheduleStore
-from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent, TaskPlanItem
+from personal_assistant.models import ExternalScheduleCandidate, RiskAssessment, ScheduleEvent, TaskPlanItem
 
 
 def test_add_list_update_delete_event(tmp_path) -> None:
@@ -119,3 +119,35 @@ def test_task_plan_crud_and_event_delete_cleanup(tmp_path) -> None:
 
     store.delete_event(event.id)
     assert store.list_task_plan(event.id) == []
+
+
+def test_risk_assessment_upsert_and_event_delete_cleanup(tmp_path) -> None:
+    store = ScheduleStore(tmp_path / "assistant.db")
+    start_at = datetime.now() + timedelta(days=1)
+    event = store.add_event(
+        ScheduleEvent(
+            id=None,
+            title="[마감] 지원 사업",
+            start_at=start_at,
+            end_at=start_at + timedelta(hours=1),
+        )
+    )
+    assert event.id is not None
+
+    saved = store.upsert_risk_assessment(
+        RiskAssessment(
+            id=None,
+            event_id=event.id,
+            risk_score=75,
+            risk_level="danger",
+            risk_factors=["마감 임박", "실행 계획 없음"],
+            next_action="오늘 서류를 점검하세요.",
+        )
+    )
+
+    assert saved.id is not None
+    assert saved.risk_factors == ["마감 임박", "실행 계획 없음"]
+    assert store.get_risk_assessment(event.id).risk_level == "danger"
+
+    store.delete_event(event.id)
+    assert store.get_risk_assessment(event.id) is None

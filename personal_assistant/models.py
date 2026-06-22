@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 
 
@@ -76,3 +76,23 @@ class TaskPlanItem:
             "before_deadline": "마감전 체크",
         }
         return labels.get(self.stage, self.stage)
+
+
+@dataclass
+class RiskAssessment:
+    id: int | None
+    event_id: int
+    risk_score: int
+    risk_level: str
+    risk_factors: list[str] = field(default_factory=list)
+    next_action: str = ""
+    assessed_at: str = ""
+
+    @property
+    def level_label(self) -> str:
+        labels = {
+            "safe": "안전",
+            "caution": "주의",
+            "danger": "위험",
+        }
+        return labels.get(self.risk_level, self.risk_level)

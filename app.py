@@ -17,6 +17,7 @@ from personal_assistant.google_calendar import GoogleCalendarClient
 from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent, TaskPlanItem
 from personal_assistant.nlp import CommandParser
 from personal_assistant.priority import recommend_priorities
+from personal_assistant.risk import assess_risks
 from personal_assistant.site_collector import REQUESTED_SITE_SOURCES, collect_interest_sites
 
 
@@ -24,7 +25,7 @@ st.set_page_config(page_title="AI Scheduler", page_icon=":calendar:", layout="wi
 
 VIEW_TITLES = {"day": "일 보기", "week": "주 보기", "month": "월 보기"}
 WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
-RIGHT_MENUS = ["상세 정보", "실행 계획", "일정 편집", "AI 일정", "Google 연동", "관심 사이트", "우선순위"]
+RIGHT_MENUS = ["상세 정보", "실행 계획", "리스크 코치", "일정 편집", "AI 일정", "Google 연동", "관심 사이트", "우선순위"]
 
 
 @st.cache_resource
@@ -65,6 +66,7 @@ def init_state() -> None:
     st.session_state.setdefault("right_menu", "상세 정보")
     st.session_state.setdefault("sync_message", "")
     st.session_state.setdefault("site_message", "")
+    st.session_state.setdefault("risk_message", "")
     st.session_state.setdefault("chat_history", [])
     st.session_state.setdefault("highlight_event_ids", [])
     st.session_state.setdefault("show_day_dialog", False)
@@ -578,6 +580,27 @@ def inject_styles() -> None:
             color: var(--muted);
             font-size: .78rem;
         }
+        .risk-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: .72rem;
+            font-weight: 850;
+            margin-left: 6px;
+        }
+        .risk-badge.safe {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .risk-badge.caution {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .risk-badge.danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
         .stButton > button {
             border-radius: 8px !important;
             font-weight: 800 !important;
@@ -761,6 +784,20 @@ def delete_event(event: ScheduleEvent) -> None:
     sync = calendar_client.delete_event(event)
     store.delete_event(int(event.id))
     st.session_state.sync_message = sync.message
+
+
+def scan_and_store_risks(events: list[ScheduleEvent]) -> None:
+    task_plan_by_event = {
+        int(event.id): store.list_task_plan(int(event.id))
+        for event in events
+        if event.id is not None
+    }
+    assessments = assess_risks(events, task_plan_by_event)
+    for assessment in assessments:
+        store.upsert_risk_assessment(assessment)
+    danger_count = sum(1 for assessment in assessments if assessment.risk_level == "danger")
+    caution_count = sum(1 for assessment in assessments if assessment.risk_level == "caution")
+    st.session_state.risk_message = f"{len(assessments)}개 일정을 스캔했습니다. 위험 {danger_count}개, 주의 {caution_count}개입니다."
 
 
 def parse_period(period: str) -> tuple[date, date]:
@@ -1177,6 +1214,8 @@ def render_right_content(events: list[ScheduleEvent], menu: str) -> None:
         render_chat_history()
     elif menu == "실행 계획":
         render_execution_planner(events)
+    elif menu == "리스크 코치":
+        render_risk_coach(events)
     elif menu == "일정 편집":
         render_event_editor(events)
     elif menu == "AI 일정":
@@ -1306,6 +1345,57 @@ def render_task_plan_item(event: ScheduleEvent, item: TaskPlanItem, events: list
                 )
             )
             st.rerun()
+
+
+def render_risk_coach(events: list[ScheduleEvent]) -> None:
+    st.markdown("<h3 class='panel-section-title'>마감 리스크 코치</h3>", unsafe_allow_html=True)
+    if st.button("리스크 다시 스캔", type="primary", use_container_width=True):
+        scan_and_store_risks(events)
+        st.rerun()
+    if st.session_state.risk_message:
+        st.info(st.session_state.risk_message)
+
+    assessments = store.list_risk_assessments()
+    event_by_id = {int(event.id): event for event in events if event.id is not None and event.end_at >= datetime.now()}
+    visible = [assessment for assessment in assessments if assessment.event_id in event_by_id]
+    if not visible:
+        st.caption("저장된 리스크 분석 결과가 없습니다. `리스크 다시 스캔`을 실행하세요.")
+        return
+
+    selected = st.session_state.selected_date
+    selected_day = [assessment for assessment in visible if event_by_id[assessment.event_id].start_at.date() == selected]
+    high_risk = [assessment for assessment in visible if assessment.risk_level in {"danger", "caution"}]
+
+    st.caption(f"선택일 리스크 {len(selected_day)}개 · 전체 주의/위험 {len(high_risk)}개")
+    for assessment in (selected_day or high_risk or visible)[:10]:
+        render_risk_card(event_by_id[assessment.event_id], assessment, events)
+
+
+def render_risk_card(event: ScheduleEvent, assessment, events: list[ScheduleEvent]) -> None:
+    badge = (
+        f"<span class='risk-badge {assessment.risk_level}'>{assessment.level_label} {assessment.risk_score}</span>"
+    )
+    with st.container(border=True):
+        st.markdown(
+            f"**{escape(event.date_label)} {escape(event.time_label)} · {escape(event.title)}** {badge}",
+            unsafe_allow_html=True,
+        )
+        st.caption(f"다음 행동: {assessment.next_action}")
+        for factor in assessment.risk_factors[:4]:
+            st.markdown(f"- {factor}")
+        action_col, plan_col = st.columns(2)
+        if action_col.button("해당 날짜 보기", key=f"risk_detail_{event.id}", use_container_width=True):
+            st.session_state.selected_date = event.start_at.date()
+            st.session_state.right_menu = "상세 정보"
+            st.rerun()
+        if plan_col.button("실행 계획 생성", key=f"risk_plan_{event.id}", use_container_width=True):
+            if event.id is not None:
+                existing = store.list_task_plan(int(event.id))
+                if not existing:
+                    store.replace_task_plan(int(event.id), generate_task_plan(event))
+                st.session_state.selected_date = event.start_at.date()
+                st.session_state.right_menu = "실행 계획"
+                st.rerun()
 
 
 def render_chat_history() -> None:
