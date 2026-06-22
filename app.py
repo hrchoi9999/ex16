@@ -391,19 +391,44 @@ def inject_styles() -> None:
             font-weight: 520;
             margin-bottom: 6px;
         }
-        div[class*="st-key-month_day_"] button,
+        div[class*="st-key-month_day_"] button {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            color: var(--text) !important;
+            align-items: flex-start !important;
+            display: flex !important;
+            justify-content: flex-start !important;
+            min-height: 100% !important;
+            padding: 8px !important;
+            text-align: left !important;
+            font-size: .82rem !important;
+            font-weight: 520 !important;
+        }
         div[class*="st-key-week_day_"] button {
             background: transparent !important;
             border: 0 !important;
             box-shadow: none !important;
             color: var(--text) !important;
-            display: block !important;
             justify-content: flex-start !important;
             min-height: 18px !important;
             padding: 0 !important;
             text-align: left !important;
             font-size: .82rem !important;
             font-weight: 520 !important;
+        }
+        div[class*="st-key-month_day_"] {
+            position: absolute !important;
+            inset: 0 !important;
+            z-index: 4 !important;
+        }
+        div[class*="st-key-month_day_"] div[data-testid="stButton"] {
+            height: 100% !important;
+            width: 100% !important;
+        }
+        div[class*="st-key-month_day_"] button {
+            height: 100% !important;
+            width: 100% !important;
         }
         div[class*="st-key-month_day_"] div[data-testid="stButton"],
         div[class*="st-key-month_day_"] div[data-testid="stButton"] > button,
@@ -438,6 +463,16 @@ def inject_styles() -> None:
             border-radius: 0 !important;
             background: #fff !important;
             overflow: hidden !important;
+            position: relative !important;
+        }
+        div[class*="st-key-month_cell_"] div[data-testid="stMarkdownContainer"] {
+            pointer-events: none !important;
+            position: relative !important;
+            z-index: 6 !important;
+        }
+        .month-cell-date-space {
+            height: 24px;
+            pointer-events: none;
         }
         div[class*="st-key-month_cell_outside_"] {
             background: #f8fafc !important;
@@ -1114,6 +1149,7 @@ def render_month(events: list[ScheduleEvent], selected: date) -> None:
                 if day.month != month.month:
                     st.caption(" ")
                 else:
+                    st.markdown("<div class='month-cell-date-space'></div>", unsafe_allow_html=True)
                     for event in day_events[:4]:
                         st.markdown(event_pill_html(event), unsafe_allow_html=True)
 
