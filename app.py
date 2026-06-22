@@ -1853,15 +1853,22 @@ def render_recommendations(events: list[ScheduleEvent]) -> None:
 
 
 def render_ai_chat_input(events: list[ScheduleEvent]) -> None:
-    with st.container(border=True):
+    with st.form("ai_chat_form", clear_on_submit=True, border=True):
         st.markdown("**AI 채팅**")
         chat_col, send_col = st.columns([0.78, 0.22], gap="small")
-        question = chat_col.text_input("AI 채팅 입력", placeholder="이번 주 면접 일정 알려줘", label_visibility="collapsed")
-        if send_col.button("전송", type="primary", use_container_width=True):
+        question = chat_col.text_input(
+            "AI 채팅 입력",
+            placeholder="이번 주 면접 일정 알려줘",
+            label_visibility="collapsed",
+            key="ai_chat_question",
+        )
+        submitted = send_col.form_submit_button("전송", type="primary", use_container_width=True)
+        if submitted:
             result = answer_schedule_question(question, events)
             st.session_state.highlight_event_ids = result.matched_event_ids
             st.session_state.chat_history.append({"question": question, "answer": result.answer})
             st.session_state.right_menu = "상세 정보"
+            st.session_state.sync_message = "AI 채팅 응답을 우측 상세 정보에 표시했습니다."
             st.rerun()
 
 
