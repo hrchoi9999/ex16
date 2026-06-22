@@ -247,13 +247,8 @@ def inject_styles() -> None:
         .brand-title {
             margin: 0;
             color: var(--primary);
-            font-size: 1.05rem;
+            font-size: 1rem;
             font-weight: 900;
-        }
-        .brand-subtitle {
-            margin: 2px 0 0;
-            color: var(--muted);
-            font-size: .82rem;
         }
         .section-label {
             color: var(--text);
@@ -379,6 +374,16 @@ def inject_styles() -> None:
             background: var(--amber-soft);
             color: #7a4b00;
         }
+        .event-pill.deadline {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fca5a5;
+            font-weight: 700;
+        }
+        .event-pill.deadline.highlight {
+            background: #fecaca;
+            color: #991b1b;
+        }
         @keyframes blink-event {
             0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.2); }
             50% { box-shadow: 0 0 0 4px rgba(245,158,11,.35); }
@@ -428,6 +433,15 @@ def inject_styles() -> None:
         .timeline-event.highlight {
             animation: blink-event 1s ease-in-out infinite;
             background: var(--amber-soft);
+        }
+        .timeline-event.deadline {
+            border-left-color: #dc2626;
+            background: #fee2e2;
+            color: #7f1d1d;
+            font-weight: 800;
+        }
+        .timeline-event.deadline.highlight {
+            background: #fecaca;
         }
         .right-title {
             margin: 0 0 12px;
@@ -676,8 +690,7 @@ def render_left(events: list[ScheduleEvent]) -> None:
         <div class="brand">
             <div class="brand-icon">AI</div>
             <div>
-                <p class="brand-title">AI Scheduler</p>
-                <p class="brand-subtitle">개인 일정 관리 · PC Workspace</p>
+                <p class="brand-title">개인 일정 관리</p>
             </div>
         </div>
         """,
@@ -941,9 +954,21 @@ def render_day(events: list[ScheduleEvent], selected: date) -> None:
     st.html("".join(grid_parts))
 
 
+def is_deadline_event(event: ScheduleEvent) -> bool:
+    return bool(event.source_url and event.source in REQUESTED_SITE_SOURCES)
+
+
+def event_visual_classes(event: ScheduleEvent) -> str:
+    classes: list[str] = []
+    if event.id in st.session_state.highlight_event_ids:
+        classes.append("highlight")
+    if is_deadline_event(event):
+        classes.append("deadline")
+    return f" {' '.join(classes)}" if classes else ""
+
+
 def event_pill_html(event: ScheduleEvent) -> str:
-    highlight = " highlight" if event.id in st.session_state.highlight_event_ids else ""
-    return f"<span class='event-pill{highlight}'>{escape(compact(event.title))}</span>"
+    return f"<span class='event-pill{event_visual_classes(event)}'>{escape(compact(event.title))}</span>"
 
 
 def timeline_event_html(event: ScheduleEvent) -> str:
@@ -951,9 +976,8 @@ def timeline_event_html(event: ScheduleEvent) -> str:
     end_hour = max(event.end_at.hour + event.end_at.minute / 60, start_hour + 1)
     top = int((start_hour - 7) * 54)
     height = max(int((end_hour - start_hour) * 54), 42)
-    highlight = " highlight" if event.id in st.session_state.highlight_event_ids else ""
     return (
-        f"<div class='timeline-event{highlight}' style='top:{top}px;height:{height}px;'>"
+        f"<div class='timeline-event{event_visual_classes(event)}' style='top:{top}px;height:{height}px;'>"
         f"{escape(event.time_label)}<br>{escape(compact(event.title, 34))}</div>"
     )
 
