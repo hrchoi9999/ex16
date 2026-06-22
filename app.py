@@ -374,7 +374,7 @@ def inject_styles() -> None:
             padding: 0;
             border-radius: 0;
             background: transparent;
-            color: var(--primary);
+            color: #4b5563;
             font-size: .66rem;
             font-weight: 600;
             white-space: nowrap;
@@ -432,7 +432,7 @@ def inject_styles() -> None:
             right: 6px;
             border-left: 0;
             background: transparent;
-            color: var(--primary);
+            color: #4b5563;
             border-radius: 0;
             padding: 0 4px;
             overflow: hidden;
