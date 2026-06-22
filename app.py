@@ -11,6 +11,7 @@ import streamlit.components.v1 as components
 
 from personal_assistant.ai_chat import answer_schedule_question
 from personal_assistant.briefing import generate_briefing
+from personal_assistant.business_days import eligible_registration_days, holiday_dates_from_events
 from personal_assistant.config import settings
 from personal_assistant.database import ScheduleStore
 from personal_assistant.execution_planner import STAGE_LABELS, generate_task_plan
@@ -807,6 +808,35 @@ def create_event(event: ScheduleEvent) -> ScheduleEvent:
     return saved
 
 
+def create_events_for_registration_period(
+    title: str,
+    start_day: date,
+    end_day: date,
+    start_time: time,
+    end_time: time,
+    description: str,
+    importance: int,
+    existing_events: list[ScheduleEvent],
+) -> list[ScheduleEvent]:
+    holiday_dates = holiday_dates_from_events(existing_events)
+    registration_days = eligible_registration_days(start_day, end_day, holiday_dates)
+    saved_events: list[ScheduleEvent] = []
+    for registration_day in registration_days:
+        saved_events.append(
+            create_event(
+                ScheduleEvent(
+                    id=None,
+                    title=title,
+                    start_at=datetime.combine(registration_day, start_time),
+                    end_at=datetime.combine(registration_day, end_time),
+                    description=description,
+                    importance=importance,
+                )
+            )
+        )
+    return saved_events
+
+
 def update_event(event: ScheduleEvent, **updates: object) -> None:
     updated = store.update_event(int(event.id), **updates)
     if updated is None:
@@ -1564,22 +1594,31 @@ def render_event_editor(events: list[ScheduleEvent], prefix: str = "main") -> No
         if submitted:
             if not title.strip():
                 st.warning("제목을 입력해 주세요.")
-            elif datetime.combine(end_day, end_time) <= datetime.combine(start_day, start_time):
-                st.warning("종료일/시간은 시작일/시간보다 이후여야 합니다.")
+            elif end_day < start_day:
+                st.warning("종료일은 시작일과 같거나 이후여야 합니다.")
+            elif end_time <= start_time:
+                st.warning("종료 시간은 시작 시간보다 이후여야 합니다.")
             else:
-                start_at = datetime.combine(start_day, start_time)
-                end_at = datetime.combine(end_day, end_time)
-                create_event(
-                    ScheduleEvent(
-                        id=None,
-                        title=title.strip(),
-                        start_at=start_at,
-                        end_at=end_at,
-                        description=description.strip(),
-                        importance=int(importance),
-                    )
+                saved_events = create_events_for_registration_period(
+                    title=title.strip(),
+                    start_day=start_day,
+                    end_day=end_day,
+                    start_time=start_time,
+                    end_time=end_time,
+                    description=description.strip(),
+                    importance=int(importance),
+                    existing_events=events,
                 )
-                st.rerun()
+                total_days = (end_day - start_day).days + 1
+                skipped_days = max(total_days - len(saved_events), 0)
+                if not saved_events:
+                    st.warning("등록 가능한 업무일이 없습니다. 토요일, 일요일은 등록 대상에서 제외됩니다.")
+                else:
+                    st.session_state.sync_message = (
+                        f"{len(saved_events)}개 업무일 일정으로 등록했습니다. "
+                        f"토요일/일요일/공휴일 {skipped_days}일은 제외했습니다."
+                    )
+                    st.rerun()
 
     st.markdown("### 선택 날짜 일정 수정/삭제")
     if not day_events:
