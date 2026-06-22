@@ -582,6 +582,25 @@ def calendar_href(target_date: date, view_mode: str, dialog: bool = False) -> st
     return f"?{urllib.parse.urlencode(params)}"
 
 
+def select_calendar_day(target_date: date, view_mode: str, day_events: list[ScheduleEvent]) -> None:
+    st.session_state.selected_date = target_date
+    st.session_state.view_mode = view_mode
+    st.query_params["view"] = view_mode
+    st.query_params["date"] = target_date.isoformat()
+    if day_events:
+        st.session_state.show_day_dialog = False
+        st.session_state.right_menu = "상세 정보"
+        st.query_params["menu"] = "상세 정보"
+        if "dialog" in st.query_params:
+            del st.query_params["dialog"]
+    else:
+        st.session_state.show_day_dialog = True
+        st.session_state.right_menu = "일정 편집"
+        st.query_params["menu"] = "일정 편집"
+        st.query_params["dialog"] = "1"
+    st.rerun()
+
+
 def shifted_date(selected: date, view_mode: str, direction: int) -> date:
     if view_mode == "month":
         return add_months(selected, direction)
@@ -943,38 +962,46 @@ def render_center(events: list[ScheduleEvent]) -> None:
 
 def render_month(events: list[ScheduleEvent], selected: date) -> None:
     month = selected.replace(day=1)
-    parts = ["<div class='month-grid'>"]
-    for label in WEEKDAY_LABELS:
-        parts.append(f"<div class='month-head'>{label}</div>")
+    head_cols = st.columns(7, gap="small")
+    for col, label in zip(head_cols, WEEKDAY_LABELS):
+        col.markdown(f"<div class='month-head'>{label}</div>", unsafe_allow_html=True)
     for week in calendar.Calendar(firstweekday=0).monthdatescalendar(month.year, month.month):
-        for day in week:
+        cols = st.columns(7, gap="small")
+        for col, day in zip(cols, week):
             day_events = events_for_day(events, day)
-            classes = ["day-link"]
-            if day.month != month.month:
-                classes.append("outside")
+            button_type = "primary" if day == selected else "secondary"
+            label = f"{day.day}"
             if day == date.today():
-                classes.append("today")
-            if day == selected:
-                classes.append("selected")
-            pills = "".join(event_pill_html(event) for event in day_events[:4])
-            parts.append(
-                f"<a class=\"{' '.join(classes)}\" href=\"{calendar_href(day, 'month', dialog=True)}\">"
-                f"<span class=\"day-number-text\">{day.day}</span>{pills}</a>"
-            )
-    parts.append("</div>")
-    st.html("".join(parts))
+                label = f"{day.day} 오늘"
+            with col.container(height=112, border=True):
+                if st.button(
+                    label,
+                    key=f"month_day_{day.isoformat()}",
+                    type=button_type,
+                    use_container_width=True,
+                    disabled=day.month != month.month,
+                ):
+                    select_calendar_day(day, "month", day_events)
+                if day.month != month.month:
+                    st.caption(" ")
+                else:
+                    for event in day_events[:4]:
+                        st.markdown(event_pill_html(event), unsafe_allow_html=True)
 
 
 def render_week(events: list[ScheduleEvent], selected: date) -> None:
     start = week_start(selected)
-    head_parts = ["<div class='week-grid'><div class='week-head-link' style='background:#fff;border-left:0;'></div>"]
+    header_cols = st.columns([0.5, 1, 1, 1, 1, 1, 1, 1], gap="small")
+    header_cols[0].markdown("<div class='week-head-link' style='background:#fff;border-left:0;'>&nbsp;</div>", unsafe_allow_html=True)
     for index in range(7):
         day = start + timedelta(days=index)
-        head_parts.append(
-            f'<a class="week-head-link" href="{calendar_href(day, "week", dialog=True)}">{WEEKDAY_LABELS[index]} {day.day}</a>'
-        )
-    head_parts.append("</div>")
-    st.html("".join(head_parts))
+        if header_cols[index + 1].button(
+            f"{WEEKDAY_LABELS[index]} {day.day}",
+            key=f"week_day_{day.isoformat()}",
+            type="primary" if day == selected else "secondary",
+            use_container_width=True,
+        ):
+            select_calendar_day(day, "week", events_for_day(events, day))
 
     grid_parts = ["<div class='week-grid'><div>"]
     for hour in range(7, 21):
@@ -1099,6 +1126,8 @@ def render_selected_detail(events: list[ScheduleEvent]) -> None:
                 store.replace_task_plan(int(event.id), generate_task_plan(event))
             st.session_state.right_menu = "실행 계획"
             st.rerun()
+    st.divider()
+    render_event_editor(events, prefix="detail")
 
 
 def render_execution_planner(events: list[ScheduleEvent]) -> None:
