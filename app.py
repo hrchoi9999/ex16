@@ -247,7 +247,7 @@ def inject_styles() -> None:
         .brand-title {
             margin: 0;
             color: var(--primary);
-            font-size: 1rem;
+            font-size: 1.2rem;
             font-weight: 900;
         }
         .section-label {
@@ -283,15 +283,21 @@ def inject_styles() -> None:
             font-weight: 900;
         }
         .calendar-nav {
-            display: grid;
-            grid-template-columns: 46px minmax(0, 1fr) 46px;
-            gap: 12px;
-            align-items: center;
+            display: flex;
+            align-items: flex-start;
             padding: 22px 24px 14px;
+        }
+        .calendar-title-group {
+            display: inline-flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .calendar-heading {
+            min-width: 150px;
         }
         .calendar-title {
             margin: 0;
-            font-size: 1.22rem;
+            font-size: .98rem;
             font-weight: 760;
         }
         .calendar-subtitle {
@@ -301,7 +307,8 @@ def inject_styles() -> None:
         }
         .nav-square {
             display: flex;
-            height: 38px;
+            width: 36px;
+            height: 36px;
             align-items: center;
             justify-content: center;
             border: 1px solid var(--line);
@@ -614,7 +621,8 @@ def create_event(event: ScheduleEvent) -> ScheduleEvent:
     if sync.google_event_id:
         event.google_event_id = sync.google_event_id
         event.sync_status = "synced"
-        event.source = "google_calendar"
+        if not event.source_url:
+            event.source = "google_calendar"
     saved = store.add_event(event)
     st.session_state.sync_message = sync.message
     return saved
@@ -660,6 +668,27 @@ def candidate_to_event(candidate: ExternalScheduleCandidate) -> ScheduleEvent:
         source_url=candidate.url,
         sync_status="local",
     )
+
+
+def save_candidate_deadline_event(candidate: ExternalScheduleCandidate) -> ScheduleEvent:
+    event = candidate_to_event(candidate)
+    existing_events = store.list_events(include_past=True)
+    existing = next((item for item in existing_events if item.source_url == candidate.url), None)
+    if existing is None:
+        return store.add_event(event)
+    updated = store.update_event(
+        int(existing.id),
+        title=event.title,
+        start_at=event.start_at,
+        end_at=event.end_at,
+        description=event.description,
+        location=event.location,
+        importance=event.importance,
+        source=event.source,
+        source_url=event.source_url,
+        sync_status="local",
+    )
+    return updated if updated is not None else existing
 
 
 def mini_calendar_html(events: list[ScheduleEvent]) -> str:
@@ -878,12 +907,14 @@ def render_center(events: list[ScheduleEvent]) -> None:
     st.markdown(
         f"""
         <div class="calendar-nav">
-            <a class="nav-square" href="{calendar_href(previous_date, view_mode)}">‹</a>
-            <div>
-                <h2 class="calendar-title">{escape(title)}</h2>
-                <p class="calendar-subtitle">{VIEW_TITLES[view_mode]} · 일정 {len(visible_events)}개</p>
+            <div class="calendar-title-group">
+                <a class="nav-square" href="{calendar_href(previous_date, view_mode)}">‹</a>
+                <div class="calendar-heading">
+                    <h2 class="calendar-title">{escape(title)}</h2>
+                    <p class="calendar-subtitle">{VIEW_TITLES[view_mode]} · 일정 {len(visible_events)}개</p>
+                </div>
+                <a class="nav-square" href="{calendar_href(next_date, view_mode)}">›</a>
             </div>
-            <a class="nav-square" href="{calendar_href(next_date, view_mode)}">›</a>
         </div>
         """,
         unsafe_allow_html=True,
@@ -955,7 +986,7 @@ def render_day(events: list[ScheduleEvent], selected: date) -> None:
 
 
 def is_deadline_event(event: ScheduleEvent) -> bool:
-    return bool(event.source_url and event.source in REQUESTED_SITE_SOURCES)
+    return bool(event.source_url and (event.title.startswith("[마감]") or event.source in REQUESTED_SITE_SOURCES))
 
 
 def event_visual_classes(event: ScheduleEvent) -> str:
@@ -1198,14 +1229,21 @@ def render_candidates() -> None:
     if not candidates:
         st.caption("수집된 모집중 공고가 없습니다. 좌측에서 관심 사이트 수집을 실행하세요.")
         return
+    if st.button("전체 후보를 마감일 일정으로 등록", use_container_width=True):
+        for candidate in candidates:
+            save_candidate_deadline_event(candidate)
+            if candidate.id is not None:
+                store.mark_candidate_selected(int(candidate.id))
+        st.success(f"{len(candidates)}개 후보를 마감일 기준 일정으로 등록/갱신했습니다.")
+        st.rerun()
     for candidate in candidates[:20]:
         st.markdown(f"**{candidate.title}**")
         st.caption(f"{candidate.source} · {candidate.category} · {candidate.recruitment_period}")
         st.link_button("원문 열기", candidate.url, use_container_width=True)
         if st.button("마감일 기준 일정 등록", key=f"candidate_{candidate.id}", use_container_width=True):
-            event = candidate_to_event(candidate)
-            create_event(event)
-            store.mark_candidate_selected(int(candidate.id))
+            save_candidate_deadline_event(candidate)
+            if candidate.id is not None:
+                store.mark_candidate_selected(int(candidate.id))
             st.success("선택한 공고를 마감일 기준 일정으로 등록했습니다.")
             st.rerun()
 
