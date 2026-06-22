@@ -1727,6 +1727,17 @@ def render_chat_history() -> None:
         st.info(item["answer"])
 
 
+def render_compact_chat_history() -> None:
+    if not st.session_state.chat_history:
+        st.caption("질문을 입력하면 답변이 여기에 표시됩니다.")
+        return
+    with st.container(height=180, border=True):
+        for item in st.session_state.chat_history[-3:]:
+            st.markdown(f"**Q. {item['question']}**")
+            st.markdown(item["answer"])
+            st.divider()
+
+
 def render_event_editor(events: list[ScheduleEvent], prefix: str = "main") -> None:
     selected = st.session_state.selected_date
     day_events = events_for_day(events, selected)
@@ -1953,6 +1964,7 @@ def render_recommendations(events: list[ScheduleEvent]) -> None:
 
 
 def render_ai_chat_input(events: list[ScheduleEvent]) -> None:
+    render_compact_chat_history()
     with st.form("ai_chat_form", clear_on_submit=True, border=True):
         st.markdown("**AI 채팅**")
         chat_col, send_col = st.columns([0.78, 0.22], gap="small")
