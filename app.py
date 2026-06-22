@@ -77,8 +77,12 @@ def init_state() -> None:
     query_view = st.query_params.get("view")
     query_date = st.query_params.get("date")
     query_dialog = st.query_params.get("dialog")
+    query_menu = st.query_params.get("menu")
     if query_view in VIEW_TITLES:
         st.session_state.view_mode = query_view
+    if query_menu in RIGHT_MENUS:
+        st.session_state.right_menu = query_menu
+        st.session_state.right_menu_radio = query_menu
     if query_date:
         try:
             st.session_state.selected_date = date.fromisoformat(query_date)
@@ -366,29 +370,26 @@ def inject_styles() -> None:
         .event-pill {
             display: block;
             margin-top: 5px;
-            padding: 4px 6px;
-            border-radius: 6px;
-            background: var(--primary-soft);
+            padding: 0;
+            border-radius: 0;
+            background: transparent;
             color: var(--primary);
             font-size: .66rem;
-            font-weight: 500;
+            font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .event-pill.highlight {
             animation: blink-event 1s ease-in-out infinite;
-            background: var(--amber-soft);
             color: #7a4b00;
         }
         .event-pill.deadline {
-            background: #fee2e2;
             color: #b91c1c;
-            border: 1px solid #fca5a5;
+            border: 0;
             font-weight: 700;
         }
         .event-pill.deadline.highlight {
-            background: #fecaca;
             color: #991b1b;
         }
         @keyframes blink-event {
@@ -428,27 +429,24 @@ def inject_styles() -> None:
             position: absolute;
             left: 6px;
             right: 6px;
-            border-left: 4px solid var(--primary);
-            background: var(--primary-soft);
-            color: var(--text);
-            border-radius: 8px;
-            padding: 7px 8px;
+            border-left: 0;
+            background: transparent;
+            color: var(--primary);
+            border-radius: 0;
+            padding: 0 4px;
             overflow: hidden;
             font-size: .76rem;
-            font-weight: 800;
+            font-weight: 650;
         }
         .timeline-event.highlight {
             animation: blink-event 1s ease-in-out infinite;
-            background: var(--amber-soft);
         }
         .timeline-event.deadline {
-            border-left-color: #dc2626;
-            background: #fee2e2;
             color: #7f1d1d;
             font-weight: 800;
         }
         .timeline-event.deadline.highlight {
-            background: #fecaca;
+            color: #991b1b;
         }
         .right-title {
             margin: 0 0 12px;
@@ -564,8 +562,14 @@ def compact(text: str, limit: int = 22) -> str:
 
 
 def calendar_href(target_date: date, view_mode: str, dialog: bool = False) -> str:
-    suffix = "&dialog=1" if dialog else ""
-    return f"?view={view_mode}&date={target_date.isoformat()}{suffix}"
+    params = {
+        "view": view_mode,
+        "date": target_date.isoformat(),
+        "menu": st.session_state.get("right_menu", "상세 정보"),
+    }
+    if dialog:
+        params["dialog"] = "1"
+    return f"?{urllib.parse.urlencode(params)}"
 
 
 def shifted_date(selected: date, view_mode: str, direction: int) -> date:
@@ -719,7 +723,7 @@ def render_left(events: list[ScheduleEvent]) -> None:
         <div class="brand">
             <div class="brand-icon">AI</div>
             <div>
-                <p class="brand-title">개인 일정 관리</p>
+                <p class="brand-title" style="font-size:2rem !important;font-weight:900 !important;color:var(--primary) !important;">개인 일정 관리</p>
             </div>
         </div>
         """,
@@ -910,7 +914,7 @@ def render_center(events: list[ScheduleEvent]) -> None:
             <div class="calendar-title-group">
                 <a class="nav-square" href="{calendar_href(previous_date, view_mode)}">‹</a>
                 <div class="calendar-heading">
-                    <h2 class="calendar-title">{escape(title)}</h2>
+                    <h2 class="calendar-title" style="font-size:.80rem !important;">{escape(title)}</h2>
                     <p class="calendar-subtitle">{VIEW_TITLES[view_mode]} · 일정 {len(visible_events)}개</p>
                 </div>
                 <a class="nav-square" href="{calendar_href(next_date, view_mode)}">›</a>
@@ -1024,6 +1028,8 @@ def render_right(events: list[ScheduleEvent]) -> None:
         key="right_menu_radio",
     )
     st.session_state.right_menu = menu
+    if st.query_params.get("menu") != menu:
+        st.query_params["menu"] = menu
     with st.container(height=560, border=True):
         render_right_content(events, menu)
     render_ai_chat_input(events)
