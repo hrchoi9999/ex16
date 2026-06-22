@@ -82,7 +82,6 @@ def init_state() -> None:
         st.session_state.view_mode = query_view
     if query_menu in RIGHT_MENUS:
         st.session_state.right_menu = query_menu
-        st.session_state.right_menu_radio = query_menu
     if query_date:
         try:
             st.session_state.selected_date = date.fromisoformat(query_date)
@@ -91,9 +90,7 @@ def init_state() -> None:
     if query_dialog == "1":
         st.session_state.show_day_dialog = True
         st.session_state.right_menu = "일정 편집"
-        if "dialog" in st.query_params:
-            del st.query_params["dialog"]
-    elif query_menu in RIGHT_MENUS and query_menu != "일정 편집":
+    else:
         st.session_state.show_day_dialog = False
 
 
@@ -255,7 +252,7 @@ def inject_styles() -> None:
         .brand-title {
             margin: 0;
             color: var(--primary);
-            font-size: 2rem;
+            font-size: 20px;
             font-weight: 900;
         }
         .section-label {
@@ -305,7 +302,7 @@ def inject_styles() -> None:
         }
         .calendar-title {
             margin: 0;
-            font-size: .80rem;
+            font-size: 24px;
             font-weight: 760;
         }
         .calendar-subtitle {
@@ -727,7 +724,7 @@ def render_left(events: list[ScheduleEvent]) -> None:
         <div class="brand">
             <div class="brand-icon">AI</div>
             <div>
-                <span class="brand-title" style="display:block;font-size:32px !important;line-height:1.05 !important;font-weight:900 !important;color:#2563eb !important;">개인 일정 관리</span>
+                <span class="brand-title" style="display:block;font-size:20px !important;line-height:1.1 !important;font-weight:900 !important;color:#2563eb !important;">개인 일정 관리</span>
             </div>
         </div>
         """,
@@ -918,7 +915,7 @@ def render_center(events: list[ScheduleEvent]) -> None:
             <div class="calendar-title-group">
                 <a class="nav-square" href="{calendar_href(previous_date, view_mode)}">‹</a>
                 <div class="calendar-heading">
-                    <span class="calendar-title" style="display:block;font-size:13px !important;line-height:1.15 !important;font-weight:760 !important;color:#0f172a !important;">{escape(title)}</span>
+                    <span class="calendar-title" style="display:block;font-size:24px !important;line-height:1.12 !important;font-weight:760 !important;color:#0f172a !important;">{escape(title)}</span>
                     <p class="calendar-subtitle">{VIEW_TITLES[view_mode]} · 일정 {len(visible_events)}개</p>
                 </div>
                 <a class="nav-square" href="{calendar_href(next_date, view_mode)}">›</a>
@@ -1029,9 +1026,12 @@ def render_right(events: list[ScheduleEvent]) -> None:
         index=RIGHT_MENUS.index(st.session_state.right_menu),
         horizontal=True,
         label_visibility="collapsed",
-        key="right_menu_radio",
     )
     st.session_state.right_menu = menu
+    if menu != "일정 편집" and st.session_state.show_day_dialog:
+        st.session_state.show_day_dialog = False
+        if "dialog" in st.query_params:
+            del st.query_params["dialog"]
     if st.query_params.get("menu") != menu:
         st.query_params["menu"] = menu
     with st.container(height=560, border=True):
