@@ -21,6 +21,8 @@ def route_ai_command(text: str) -> AiRoute:
     if _has_any(command, "구글", "google", "캘린더 가져", "캘린더 동기", "동기화", "가져와"):
         return AiRoute("google_sync", "Google 연동")
     if _has_any(command, "관심 사이트", "공고", "모집", "크롤", "수집", "k-startup", "50플러스"):
+        if _has_any(command, "캘린더", "일정", "등록", "넣어", "넣", "추가"):
+            return AiRoute("collect_and_register_sites", "관심 사이트")
         return AiRoute("collect_sites", "관심 사이트")
     if _has_any(command, "우선순위", "우선 순위", "중요한", "먼저"):
         return AiRoute("priority", "우선순위")

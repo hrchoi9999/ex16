@@ -28,6 +28,13 @@ def test_route_site_collection() -> None:
     assert route.menu == "관심 사이트"
 
 
+def test_route_site_collection_and_calendar_registration() -> None:
+    route = route_ai_command("외부 공고를 수집해서 캘린더 일정으로 등록해줘")
+
+    assert route.intent == "collect_and_register_sites"
+    assert route.menu == "관심 사이트"
+
+
 def test_route_analysis_menus() -> None:
     assert route_ai_command("우선순위 추천해줘").intent == "priority"
     assert route_ai_command("리스크 분석해줘").intent == "risk"

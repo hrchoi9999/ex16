@@ -28,7 +28,7 @@ from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent, 
 from personal_assistant.nlp import CommandParser
 from personal_assistant.priority import recommend_priorities
 from personal_assistant.risk import assess_risks
-from personal_assistant.site_collector import REQUESTED_SITE_SOURCES, collect_interest_sites
+from personal_assistant.site_collector import CollectionResult, REQUESTED_SITE_SOURCES, collect_interest_sites
 
 
 st.set_page_config(page_title="AI Scheduler", page_icon=":calendar:", layout="wide")
@@ -961,14 +961,24 @@ def handle_ai_chat_command(question: str, events: list[ScheduleEvent]) -> None:
         chat_reply(question, f"Google Calendar 현재 보기 범위 가져오기를 실행했습니다. 저장된 일정 수: {before}개 → {after}개")
         return
     if route.intent == "collect_sites":
-        result = collect_interest_sites()
-        if result.success:
-            store.delete_candidates_by_sources(REQUESTED_SITE_SOURCES)
-        for candidate in result.candidates:
-            store.upsert_candidate(candidate)
-        st.session_state.last_site_collection_at = datetime.now()
-        st.session_state.site_message = result.message
+        result, saved_candidates = collect_and_store_interest_site_candidates()
         chat_reply(question, f"관심 사이트 수집을 실행했습니다. {result.message}")
+        return
+    if route.intent == "collect_and_register_sites":
+        result, saved_candidates = collect_and_store_interest_site_candidates()
+        saved_events = register_candidates_as_deadline_events(saved_candidates)
+        st.session_state.highlight_event_ids = [int(event.id) for event in saved_events[:8] if event.id is not None]
+        if saved_events:
+            st.session_state.selected_date = saved_events[0].start_at.date()
+        lines = [
+            "관심 사이트 공고를 수집하고 마감일 기준으로 캘린더에 등록/갱신했습니다.",
+            f"- 수집 후보: {len(saved_candidates)}개",
+            f"- 캘린더 반영: {len(saved_events)}개",
+            f"- 수집 결과: {result.message}",
+        ]
+        for event in saved_events[:5]:
+            lines.append(f"- {event.start_at:%Y-%m-%d}: {event.title}")
+        chat_reply(question, "\n".join(lines))
         return
     if route.intent == "priority":
         recommendations = recommend_priorities([event for event in events if event.end_at >= datetime.now()])
@@ -1081,6 +1091,27 @@ def save_candidate_deadline_event(candidate: ExternalScheduleCandidate) -> Sched
         sync_status="local",
     )
     return updated if updated is not None else existing
+
+
+def collect_and_store_interest_site_candidates() -> tuple[CollectionResult, list[ExternalScheduleCandidate]]:
+    result = collect_interest_sites()
+    if result.success:
+        store.delete_candidates_by_sources(REQUESTED_SITE_SOURCES)
+    saved_candidates: list[ExternalScheduleCandidate] = []
+    for candidate in result.candidates:
+        saved_candidates.append(store.upsert_candidate(candidate))
+    st.session_state.last_site_collection_at = datetime.now()
+    st.session_state.site_message = result.message
+    return result, saved_candidates
+
+
+def register_candidates_as_deadline_events(candidates: list[ExternalScheduleCandidate]) -> list[ScheduleEvent]:
+    saved_events: list[ScheduleEvent] = []
+    for candidate in candidates:
+        saved_events.append(save_candidate_deadline_event(candidate))
+        if candidate.id is not None:
+            store.mark_candidate_selected(int(candidate.id))
+    return saved_events
 
 
 def mini_calendar_html(events: list[ScheduleEvent]) -> str:
