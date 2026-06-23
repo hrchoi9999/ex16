@@ -735,17 +735,6 @@ function App() {
           {candidates.length}
           {TEXT.candidates}
         </p>
-        <div className="candidate-preview">
-          {candidates.length === 0 ? (
-            <span>{TEXT.noCandidates}</span>
-          ) : (
-            candidates.slice(0, 3).map((candidate) => (
-              <a href={candidate.url} key={`${candidate.id ?? candidate.url}-${candidate.title}`} target="_blank" rel="noreferrer">
-                {compactTitle(candidate.title)}
-              </a>
-            ))
-          )}
-        </div>
 
         <p className="section-label">{TEXT.miniCalendar}</p>
         <div className="mini-calendar">
