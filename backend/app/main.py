@@ -10,6 +10,7 @@ from personal_assistant.ai_chat import answer_schedule_question
 from personal_assistant.ai_router import route_ai_command
 from personal_assistant.config import settings
 from personal_assistant.database import ScheduleStore
+from personal_assistant.google_calendar import GoogleCalendarClient
 from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent
 from personal_assistant.site_collector import REQUESTED_SITE_SOURCES, collect_interest_sites
 
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 store = ScheduleStore(settings.database_path)
+google_client = GoogleCalendarClient()
 
 
 class HealthResponse(BaseModel):
@@ -76,6 +78,31 @@ class CollectionResponse(BaseModel):
     message: str
     saved_count: int
     candidates: list[CandidateResponse]
+
+
+class GoogleStatusResponse(BaseModel):
+    enabled: bool
+    linked: bool
+    email: str
+    message: str
+
+
+class GoogleOAuthStartResponse(BaseModel):
+    enabled: bool
+    success: bool
+    message: str
+    authorization_url: str
+
+
+class GoogleActionResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class GoogleImportResponse(BaseModel):
+    success: bool
+    message: str
+    imported_count: int
 
 
 class AiChatRequest(BaseModel):
@@ -133,6 +160,60 @@ def list_events(include_past: bool = True) -> list[EventResponse]:
 def active_user() -> UserResponse | None:
     user = store.get_active_user()
     return UserResponse.model_validate(user, from_attributes=True) if user else None
+
+
+@app.get("/google/status", response_model=GoogleStatusResponse)
+def google_status() -> GoogleStatusResponse:
+    user = store.get_active_user()
+    token_exists = GoogleCalendarClient._token_path().exists()
+    linked = bool(user or token_exists)
+    email = user.email if user else settings.google_registered_email or ("google-user" if token_exists else "")
+    if linked:
+        message = "Google Calendar가 연결되어 있습니다. 기존 OAuth 토큰을 재사용합니다."
+    elif google_client.enabled:
+        message = "초대된 사용자는 Google 계정 연동을 한 번 진행하면 됩니다."
+    else:
+        message = "Google Calendar OAuth 설정이 아직 없습니다."
+    return GoogleStatusResponse(enabled=google_client.enabled, linked=linked, email=email, message=message)
+
+
+@app.post("/google/oauth/start", response_model=GoogleOAuthStartResponse)
+def start_google_oauth() -> GoogleOAuthStartResponse:
+    result = google_client.start_oauth(settings.google_registered_email)
+    return GoogleOAuthStartResponse(
+        enabled=result.enabled,
+        success=result.success,
+        message=result.message,
+        authorization_url=result.authorization_url,
+    )
+
+
+@app.post("/google/import", response_model=GoogleImportResponse)
+def import_google_events(start: date, end: date) -> GoogleImportResponse:
+    start_at = datetime.combine(start, time.min)
+    end_at = datetime.combine(end, time.max)
+    result = google_client.list_events(start_at, end_at)
+    if not result.success:
+        return GoogleImportResponse(success=False, message=result.message, imported_count=0)
+
+    imported_count = 0
+    for event in result.events:
+        store.upsert_google_event(event)
+        imported_count += 1
+
+    email = settings.google_registered_email or "google-user"
+    store.register_user(email, email.split("@")[0], "google")
+
+    return GoogleImportResponse(success=True, message=result.message, imported_count=imported_count)
+
+
+@app.delete("/google/account", response_model=GoogleActionResponse)
+def disconnect_google_account() -> GoogleActionResponse:
+    token_path = GoogleCalendarClient._token_path()
+    if token_path.exists():
+        token_path.unlink()
+    store.clear_users()
+    return GoogleActionResponse(success=True, message="Google Calendar 연동을 해제했습니다. 다시 사용하려면 Google 계정 연동을 진행하세요.")
 
 
 @app.get("/events/today", response_model=list[EventResponse])

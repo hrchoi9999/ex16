@@ -12,6 +12,8 @@ streamlit.out
 streamlit.err
 backend.out
 backend.err
+fastapi.out
+fastapi.err
 frontend.out
 frontend.err
 *.log

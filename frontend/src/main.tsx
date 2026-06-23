@@ -61,6 +61,26 @@ type AiChatResponse = {
 
 type ViewMode = "month" | "week" | "day";
 
+type GoogleStatus = {
+  enabled: boolean;
+  linked: boolean;
+  email: string;
+  message: string;
+};
+
+type GoogleOAuthStartResponse = {
+  enabled: boolean;
+  success: boolean;
+  message: string;
+  authorization_url: string;
+};
+
+type GoogleImportResponse = {
+  success: boolean;
+  message: string;
+  imported_count: number;
+};
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const WEEKDAYS = ["\uC6D4", "\uD654", "\uC218", "\uBAA9", "\uAE08", "\uD1A0", "\uC77C"];
 const KOREAN_FIXED_HOLIDAYS = new Set(["01-01", "03-01", "05-05", "06-06", "08-15", "10-03", "10-09", "12-25"]);
@@ -128,9 +148,13 @@ const TEXT = {
   edit: "\uC218\uC815",
   delete: "\uC0AD\uC81C",
   googleAccount: "Google Account",
-  googleHelp: "Google \uB85C\uADF8\uC778\uC73C\uB85C \uCE98\uB9B0\uB354\uB97C \uC5F0\uACB0\uD558\uC138\uC694.",
-  googleLinked: "\uC5F0\uACB0\uB428",
-  googleNext: "Google OAuth \uC791\uC5C5\uC740 \uB2E4\uC74C sprint\uC5D0\uC11C \uC774\uC2DD\uD569\uB2C8\uB2E4.",
+  googleHelp: "\uCD08\uB300\uB41C \uC0AC\uC6A9\uC790\uB9CC Google Calendar\uB97C \uC5F0\uACB0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  googleLinked: "\uC5F0\uB3D9\uB428",
+  googleUnlinked: "\uBBF8\uC5F0\uB3D9",
+  googleConnect: "Google \uACC4\uC815 \uC5F0\uB3D9",
+  googleImport: "\uCE98\uB9B0\uB354 \uB2E4\uC2DC \uAC00\uC838\uC624\uAE30",
+  googleDisconnect: "\uC5F0\uB3D9 \uD574\uC81C",
+  googlePrivate: "\uCD08\uB300\uB41C \uC0AC\uC6A9\uC790\uB9CC \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
   interestSites: "Interest Sites",
   collectNow: "\uAD00\uC2EC \uC0AC\uC774\uD2B8 \uC9C0\uAE08 \uC218\uC9D1",
   collecting: "\uC218\uC9D1 \uC911...",
@@ -333,9 +357,11 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [chatting, setChatting] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [activeUser, setActiveUser] = useState<ActiveUser | null>(null);
+  const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -382,12 +408,16 @@ function App() {
 
   const loadSidebarData = useCallback(async () => {
     try {
-      const [userResponse, candidatesResponse] = await Promise.all([
+      const [userResponse, googleResponse, candidatesResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/user/active`),
+        fetch(`${API_BASE_URL}/google/status`),
         fetch(`${API_BASE_URL}/candidates`),
       ]);
       if (userResponse.ok) {
         setActiveUser((await userResponse.json()) as ActiveUser | null);
+      }
+      if (googleResponse.ok) {
+        setGoogleStatus((await googleResponse.json()) as GoogleStatus);
       }
       if (candidatesResponse.ok) {
         setCandidates((await candidatesResponse.json()) as Candidate[]);
@@ -469,6 +499,64 @@ function App() {
       setError((caught as Error).message);
     } finally {
       setCollecting(false);
+    }
+  }
+
+  async function startGoogleConnect() {
+    setGoogleBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/google/oauth/start`, { method: "POST" });
+      const payload = (await response.json()) as GoogleOAuthStartResponse;
+      if (!response.ok || !payload.success || !payload.authorization_url) {
+        throw new Error(payload.message || `API response error: ${response.status}`);
+      }
+      window.open(payload.authorization_url, "_blank", "noopener,noreferrer");
+      setMessage("Google 로그인 화면을 열었습니다. 새 사용자만 최초 1회 권한 동의가 필요합니다.");
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
+
+  async function importGoogleCalendar() {
+    setGoogleBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/google/import?start=${rangeStart}&end=${rangeEnd}`, { method: "POST" });
+      const payload = (await response.json()) as GoogleImportResponse;
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || `API response error: ${response.status}`);
+      }
+      setMessage(`${payload.imported_count}개 Google Calendar 일정을 가져왔습니다.`);
+      await loadEvents();
+      await loadSidebarData();
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
+
+  async function disconnectGoogleAccount() {
+    setGoogleBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/google/account`, { method: "DELETE" });
+      if (!response.ok) {
+        throw new Error(`API response error: ${response.status}`);
+      }
+      setActiveUser(null);
+      await loadSidebarData();
+      setMessage("Google Calendar 연동을 해제했습니다.");
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setGoogleBusy(false);
     }
   }
 
@@ -617,15 +705,27 @@ function App() {
 
         <p className="section-label">{TEXT.googleAccount}</p>
         <div className="account-card">
-          <span className={`status-dot ${activeUser ? "online" : ""}`} />
+          <span className={`status-dot ${googleStatus?.linked || activeUser ? "online" : ""}`} />
           <div>
-            <strong>{activeUser?.email ?? "google-user"}</strong>
-            <p>{activeUser ? TEXT.googleLinked : TEXT.googleHelp}</p>
+            <strong>{googleStatus?.linked || activeUser ? TEXT.googleLinked : TEXT.googleUnlinked}</strong>
+            <p>{activeUser?.email || googleStatus?.email || TEXT.googleHelp}</p>
           </div>
         </div>
-        <button className="secondary-action" disabled>
-          {TEXT.googleNext}
-        </button>
+        <p className="sidebar-caption">{googleStatus?.message || TEXT.googlePrivate}</p>
+        {googleStatus?.linked || activeUser ? (
+          <div className="stacked-actions">
+            <button className="secondary-action" disabled={googleBusy} onClick={() => void importGoogleCalendar()}>
+              {googleBusy ? TEXT.loading : TEXT.googleImport}
+            </button>
+            <button className="secondary-action subtle" disabled={googleBusy} onClick={() => void disconnectGoogleAccount()}>
+              {TEXT.googleDisconnect}
+            </button>
+          </div>
+        ) : (
+          <button className="secondary-action" disabled={googleBusy || googleStatus?.enabled === false} onClick={() => void startGoogleConnect()}>
+            {googleBusy ? TEXT.loading : TEXT.googleConnect}
+          </button>
+        )}
 
         <p className="section-label">{TEXT.interestSites}</p>
         <button className="secondary-action" disabled={collecting} onClick={() => void collectCandidates()}>

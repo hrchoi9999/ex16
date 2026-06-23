@@ -194,6 +194,22 @@ button:disabled {
   line-height: 1.35;
 }
 
+.stacked-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.stacked-actions .secondary-action {
+  margin-top: 0;
+}
+
+.secondary-action.subtle {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+}
+
 .candidate-preview {
   display: grid;
   gap: 6px;

@@ -286,6 +286,10 @@ class ScheduleStore:
             row = connection.execute("SELECT * FROM users ORDER BY linked_at DESC LIMIT 1").fetchone()
         return self._row_to_user(row) if row else None
 
+    def clear_users(self) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM users")
+
     def upsert_candidate(self, candidate: ExternalScheduleCandidate) -> ExternalScheduleCandidate:
         now = candidate.collected_at or datetime.now().isoformat(timespec="seconds")
         with self._connect() as connection:
