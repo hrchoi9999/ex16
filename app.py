@@ -526,6 +526,12 @@ def inject_styles() -> None:
         .event-pill.deadline.highlight {
             color: #991b1b;
         }
+        .event-pill.seoul50plus {
+            color: #60a5fa;
+        }
+        .event-pill.seoul50plus.highlight {
+            color: #3b82f6;
+        }
         @keyframes blink-event {
             0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.2); }
             50% { box-shadow: 0 0 0 4px rgba(245,158,11,.35); }
@@ -581,6 +587,12 @@ def inject_styles() -> None:
         }
         .timeline-event.deadline.highlight {
             color: #991b1b;
+        }
+        .timeline-event.seoul50plus {
+            color: #60a5fa;
+        }
+        .timeline-event.seoul50plus.highlight {
+            color: #3b82f6;
         }
         .right-title {
             margin: 0 0 12px;
@@ -1457,12 +1469,18 @@ def is_deadline_event(event: ScheduleEvent) -> bool:
     return bool(event.source_url and (event.title.startswith("[마감]") or event.source in REQUESTED_SITE_SOURCES))
 
 
+def is_seoul50plus_event(event: ScheduleEvent) -> bool:
+    return bool(event.source_url and event.source in {"서울50플러스 일자리몽땅", "서울50플러스재단"})
+
+
 def event_visual_classes(event: ScheduleEvent) -> str:
     classes: list[str] = []
     if event.id in st.session_state.highlight_event_ids:
         classes.append("highlight")
     if is_deadline_event(event):
         classes.append("deadline")
+    if is_seoul50plus_event(event):
+        classes.append("seoul50plus")
     return f" {' '.join(classes)}" if classes else ""
 
 
