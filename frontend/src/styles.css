@@ -295,7 +295,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 30px;
-  min-height: 108px;
+  min-height: 96px;
   border-bottom: 1px solid #e5eaf2;
 }
 
@@ -319,7 +319,7 @@ button:disabled {
 }
 
 .calendar-heading p {
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   color: #64748b;
   font-size: 0.95rem;
 }
