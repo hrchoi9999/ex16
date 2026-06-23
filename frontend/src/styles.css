@@ -109,7 +109,9 @@ button:disabled {
   height: 46px;
   flex: 0 0 46px;
   place-items: center;
+  border-color: #dbe3ef;
   border-radius: 999px;
+  color: #94a3b8;
   font-weight: 800;
 }
 
@@ -118,6 +120,7 @@ button:disabled {
 }
 
 .view-switcher .active {
+  border-color: #0f172a;
   background: #0f172a;
   color: #fff;
 }
