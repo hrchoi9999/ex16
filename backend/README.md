@@ -21,5 +21,6 @@ C:\AI_Agent\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload --
 - `GET /user/active`
 - `GET /candidates`
 - `POST /candidates/collect`
+- `POST /ai/chat`
 
 The backend reuses the existing `personal_assistant` domain modules and SQLite database.

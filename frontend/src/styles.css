@@ -449,11 +449,18 @@ button:disabled {
   border-radius: 8px;
   background: #f8fafc;
   padding: 18px;
+  font-size: 0.86rem;
 }
 
 .detail-panel h2 {
   margin: 0 0 16px;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
+}
+
+.detail-panel h3 {
+  margin: 0 0 10px;
+  color: #334155;
+  font-size: 0.9rem;
 }
 
 .empty {
@@ -474,7 +481,7 @@ button:disabled {
 
 .detail-card strong {
   display: block;
-  font-size: 0.98rem;
+  font-size: 0.9rem;
   line-height: 1.45;
 }
 
@@ -493,7 +500,7 @@ button:disabled {
 .detail-card p {
   margin: 10px 0 0;
   color: #64748b;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   line-height: 1.55;
 }
 
@@ -502,9 +509,47 @@ button:disabled {
   gap: 6px;
   align-items: center;
   color: #2563eb;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.chat-thread {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.chat-message {
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.chat-message.user {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.chat-message.assistant {
+  border-color: #e9d5ff;
+  background: #faf5ff;
+}
+
+.chat-message strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #334155;
+  font-size: 0.74rem;
+}
+
+.chat-message p {
+  margin: 0;
+  color: #334155;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
 }
 
 .card-actions,
@@ -525,7 +570,7 @@ button:disabled {
   justify-content: center;
   padding: 0 12px;
   color: #334155;
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
@@ -579,10 +624,46 @@ button:disabled {
 }
 
 .chat-card {
+  display: grid;
   flex: 0 0 auto;
+  gap: 10px;
+  align-items: stretch;
   color: #475569;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.chat-card label {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-card label span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: #334155;
+  font-weight: 800;
+}
+
+.chat-card textarea {
+  width: 100%;
+  min-height: 92px;
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.86rem;
+  resize: vertical;
+}
+
+.chat-card button {
+  min-height: 42px;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 800;
 }
 
 @media (max-width: 1180px) {

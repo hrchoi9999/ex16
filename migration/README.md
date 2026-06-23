@@ -47,3 +47,11 @@ Move AI Scheduler from a Streamlit monolith to a maintainable web-service struct
 - Interest-site collection can be triggered from the React sidebar.
 - Mini Calendar stays synchronized with the selected date and main month view.
 - Google OAuth flow and candidate-to-calendar registration remain in later sprints.
+
+## Sprint 4 Result
+
+- FastAPI exposes `POST /ai/chat`.
+- React lower-right AI chat input sends questions to the backend.
+- Chat messages render in the right middle scroll panel.
+- New AI responses auto-scroll into view.
+- Matching schedule answers move focus to the first matched event date when available in the loaded calendar range.

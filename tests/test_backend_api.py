@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 import backend.app.main as backend_main
 from backend.app.main import app
+from personal_assistant.ai_chat import AiChatResult
 from personal_assistant.models import AppUser, ExternalScheduleCandidate
 from personal_assistant.site_collector import CollectionResult
 
@@ -139,3 +140,20 @@ def test_event_crud_endpoints() -> None:
 
     missing_delete_response = client.delete(f"/events/{event_id}")
     assert missing_delete_response.status_code == 404
+
+
+def test_ai_chat_endpoint(monkeypatch) -> None:
+    client = TestClient(app)
+
+    def fake_answer_schedule_question(question, events) -> AiChatResult:
+        return AiChatResult(answer=f"answer for {question}", matched_event_ids=[1])
+
+    monkeypatch.setattr(backend_main, "answer_schedule_question", fake_answer_schedule_question)
+
+    response = client.post("/ai/chat", json={"question": "이번 주 일정 알려줘"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["answer"] == "answer for 이번 주 일정 알려줘"
+    assert payload["matched_event_ids"] == [1]
+    assert payload["intent"] == "query"

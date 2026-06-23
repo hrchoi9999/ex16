@@ -1,4 +1,4 @@
-import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Bot, ExternalLink, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import "./styles.css";
@@ -46,6 +46,19 @@ type EventFormState = {
   importance: number;
 };
 
+type ChatMessage = {
+  id: number;
+  role: "user" | "assistant";
+  text: string;
+};
+
+type AiChatResponse = {
+  answer: string;
+  matched_event_ids: number[];
+  intent: string;
+  menu: string;
+};
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const WEEKDAYS = ["\uC6D4", "\uD654", "\uC218", "\uBAA9", "\uAE08", "\uD1A0", "\uC77C"];
 const TEXT = {
@@ -61,7 +74,11 @@ const TEXT = {
   today: "\uC624\uB298",
   eventCount: "\uC77C\uC815",
   items: "\uAC1C",
-  aiNext: "AI \uCC44\uD305 \uC5F0\uACB0\uC740 \uB2E4\uC74C sprint\uC5D0\uC11C \uC774\uC2DD\uD569\uB2C8\uB2E4.",
+  aiChat: "AI \uCC44\uD305",
+  aiPlaceholder: "\uC608: \uC774\uBC88 \uC8FC \uBA74\uC811 \uC77C\uC815 \uC54C\uB824\uC918",
+  send: "\uC804\uC1A1",
+  asking: "\uD655\uC778 \uC911...",
+  chatEmpty: "\uC544\uC9C1 AI \uCC44\uD305 \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uD558\uB2E8\uC5D0\uC11C \uC77C\uC815\uC744 \uC9C8\uBB38\uD574 \uBCF4\uC138\uC694.",
   createTitle: "\uC120\uD0DD \uB0A0\uC9DC \uC77C\uC815 \uB4F1\uB85D",
   editTitle: "\uC77C\uC815 \uC218\uC815",
   title: "\uC81C\uBAA9",
@@ -197,12 +214,16 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [collecting, setCollecting] = useState(false);
+  const [chatting, setChatting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [activeUser, setActiveUser] = useState<ActiveUser | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [form, setForm] = useState<EventFormState>(() => newFormForDate(today));
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const monthDays = useMemo(() => buildMonthDays(month), [month]);
   const rangeStart = formatDateKey(monthDays[0]);
@@ -263,6 +284,10 @@ function App() {
       setForm(newFormForDate(selectedDate));
     }
   }, [editingEventId, selectedDate]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [chatMessages, chatting]);
 
   const visibleEvents = events.filter((event) => {
     const start = parseDateTime(event.start_at);
@@ -326,6 +351,54 @@ function App() {
       setError((caught as Error).message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function submitChat(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const question = chatInput.trim();
+    if (!question) {
+      return;
+    }
+
+    const userMessage: ChatMessage = { id: Date.now(), role: "user", text: question };
+    setChatMessages((current) => [...current, userMessage]);
+    setChatInput("");
+    setChatting(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+      if (!response.ok) {
+        throw new Error(`API response error: ${response.status}`);
+      }
+      const payload = (await response.json()) as AiChatResponse;
+      setChatMessages((current) => [
+        ...current,
+        { id: Date.now() + 1, role: "assistant", text: payload.answer },
+      ]);
+
+      const matched = events.find((item) => item.id !== null && payload.matched_event_ids.includes(item.id));
+      if (matched) {
+        const matchedDate = parseDateTime(matched.start_at);
+        setSelectedDate(matchedDate);
+        setMonth(new Date(matchedDate.getFullYear(), matchedDate.getMonth(), 1));
+      }
+    } catch (caught) {
+      setChatMessages((current) => [
+        ...current,
+        {
+          id: Date.now() + 2,
+          role: "assistant",
+          text: `AI \uCC44\uD305 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. ${(caught as Error).message}`,
+        },
+      ]);
+    } finally {
+      setChatting(false);
     }
   }
 
@@ -527,6 +600,26 @@ function App() {
           <h2>
             {formatDateKey(selectedDate)} {TEXT.detail}
           </h2>
+          <section className="chat-thread" aria-live="polite">
+            <h3>{TEXT.aiChat}</h3>
+            {chatMessages.length === 0 ? (
+              <p className="empty">{TEXT.chatEmpty}</p>
+            ) : (
+              chatMessages.map((item) => (
+                <article className={`chat-message ${item.role}`} key={item.id}>
+                  <strong>{item.role === "user" ? "\uC0AC\uC6A9\uC790" : "AI"}</strong>
+                  <p>{item.text}</p>
+                </article>
+              ))
+            )}
+            {chatting ? (
+              <article className="chat-message assistant">
+                <strong>AI</strong>
+                <p>{TEXT.asking}</p>
+              </article>
+            ) : null}
+            <div ref={chatEndRef} />
+          </section>
           {selectedEvents.length === 0 ? (
             <p className="empty">{TEXT.selectedDayEmpty}</p>
           ) : (
@@ -624,10 +717,22 @@ function App() {
             </div>
           </form>
         </section>
-        <div className="chat-card">
-          <Bot size={18} />
-          <span>{TEXT.aiNext}</span>
-        </div>
+        <form className="chat-card" onSubmit={(event) => void submitChat(event)}>
+          <label>
+            <span>
+              <Bot size={16} /> {TEXT.aiChat}
+            </span>
+            <textarea
+              rows={3}
+              value={chatInput}
+              placeholder={TEXT.aiPlaceholder}
+              onChange={(event) => setChatInput(event.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={chatting || !chatInput.trim()}>
+            {chatting ? TEXT.asking : TEXT.send}
+          </button>
+        </form>
       </aside>
     </main>
   );

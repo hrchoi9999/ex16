@@ -6,6 +6,8 @@ from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from personal_assistant.ai_chat import answer_schedule_question
+from personal_assistant.ai_router import route_ai_command
 from personal_assistant.config import settings
 from personal_assistant.database import ScheduleStore
 from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent
@@ -74,6 +76,17 @@ class CollectionResponse(BaseModel):
     message: str
     saved_count: int
     candidates: list[CandidateResponse]
+
+
+class AiChatRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+
+
+class AiChatResponse(BaseModel):
+    answer: str
+    matched_event_ids: list[int]
+    intent: str
+    menu: str
 
 
 class EventCreateRequest(BaseModel):
@@ -166,6 +179,59 @@ def collect_candidates() -> CollectionResponse:
         message=result.message,
         saved_count=len(saved_candidates),
         candidates=[CandidateResponse.model_validate(candidate) for candidate in saved_candidates],
+    )
+
+
+@app.post("/ai/chat", response_model=AiChatResponse)
+def ai_chat(payload: AiChatRequest) -> AiChatResponse:
+    route = route_ai_command(payload.question)
+    events = store.list_events(include_past=True)
+
+    if route.intent == "query":
+        result = answer_schedule_question(payload.question, events)
+        return AiChatResponse(
+            answer=result.answer,
+            matched_event_ids=result.matched_event_ids,
+            intent=route.intent,
+            menu=route.menu,
+        )
+
+    if route.intent == "collect_sites":
+        collection = collect_candidates()
+        return AiChatResponse(
+            answer=f"관심 사이트 수집을 실행했습니다.\n{collection.message}",
+            matched_event_ids=[],
+            intent=route.intent,
+            menu=route.menu,
+        )
+
+    if route.intent == "collect_and_register_sites":
+        collection = collect_candidates()
+        return AiChatResponse(
+            answer=(
+                "관심 사이트 후보 수집까지 완료했습니다. "
+                "마감일 기준 캘린더 등록은 후보 확인 UI 이식 sprint에서 연결하겠습니다.\n"
+                f"{collection.message}"
+            ),
+            matched_event_ids=[],
+            intent=route.intent,
+            menu=route.menu,
+        )
+
+    if route.intent in {"create_event", "edit_help", "delete_help"}:
+        return AiChatResponse(
+            answer="일정 등록, 수정, 삭제는 현재 우측 일정 편집 폼에서 처리할 수 있습니다. 질문한 날짜를 선택한 뒤 폼을 사용해 주세요.",
+            matched_event_ids=[],
+            intent=route.intent,
+            menu=route.menu,
+        )
+
+    result = answer_schedule_question(payload.question, events)
+    return AiChatResponse(
+        answer=result.answer,
+        matched_event_ids=result.matched_event_ids,
+        intent=route.intent,
+        menu=route.menu,
     )
 
 

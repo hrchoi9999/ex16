@@ -32,3 +32,11 @@ The first migration target is the PC three-panel layout: left navigation, center
 - Shows Google account connection status.
 - Adds interest-site candidate count, preview links, and collection trigger.
 - Adds a clickable mini calendar synchronized with the main month calendar.
+
+## Sprint 4 Scope
+
+- Adds the React AI chat input in the lower right panel.
+- Sends chat questions to `POST /ai/chat`.
+- Shows chat history inside the right middle scroll area.
+- Auto-scrolls the right middle panel to the latest chat response.
+- Keeps the chat typography slightly smaller than the legacy Streamlit UI.
