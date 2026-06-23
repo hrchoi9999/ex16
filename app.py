@@ -1375,7 +1375,7 @@ def render_center(events: list[ScheduleEvent]) -> None:
     )
     previous_date = shifted_date(selected, view_mode, -1)
     next_date = shifted_date(selected, view_mode, 1)
-    _left_spacer, nav_prev, nav_title, nav_next, _right_spacer = st.columns([1, 0.08, 0.46, 0.08, 1], gap="small")
+    _left_spacer, nav_prev, nav_title, nav_next, _right_spacer = st.columns([0.94, 0.08, 0.46, 0.08, 1.06], gap="small")
     nav_prev.button(
         "‹",
         key=f"nav_prev_{view_mode}_{selected.isoformat()}",
