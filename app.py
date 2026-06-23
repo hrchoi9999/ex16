@@ -367,9 +367,6 @@ def inject_styles() -> None:
             display: flex !important;
             justify-content: flex-start !important;
         }
-        div[class*="st-key-nav_next"] button {
-            margin-left: 30px !important;
-        }
         div[class*="st-key-nav_prev"] button:hover,
         div[class*="st-key-nav_next"] button:hover {
             border-color: var(--primary) !important;
@@ -1375,7 +1372,10 @@ def render_center(events: list[ScheduleEvent]) -> None:
     )
     previous_date = shifted_date(selected, view_mode, -1)
     next_date = shifted_date(selected, view_mode, 1)
-    _left_spacer, nav_prev, nav_title, nav_next, _right_spacer = st.columns([0.94, 0.08, 0.46, 0.08, 1.06], gap="small")
+    _left_spacer, nav_prev, nav_title, _nav_gap, nav_next, _right_spacer = st.columns(
+        [0.94, 0.08, 0.46, 0.04, 0.08, 1.02],
+        gap="small",
+    )
     nav_prev.button(
         "‹",
         key=f"nav_prev_{view_mode}_{selected.isoformat()}",
