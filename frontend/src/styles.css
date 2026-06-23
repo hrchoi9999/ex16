@@ -1,7 +1,7 @@
 :root {
   color: #0f172a;
   background: #f8fafc;
-  font-family: Inter, Pretendard, Roboto, system-ui, sans-serif;
+  font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", Inter, Roboto, Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
