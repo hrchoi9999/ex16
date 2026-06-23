@@ -11,3 +11,10 @@ npm.cmd run dev
 ```
 
 The first migration target is the PC three-panel layout: left navigation, center calendar, and right task/AI panel.
+
+## Sprint 1 Scope
+
+- Reads events from `http://localhost:8000/events/range`.
+- Renders the PC month calendar in a three-panel layout.
+- Shows selected date details in the right panel.
+- Uses `VITE_API_BASE_URL` when a different backend URL is needed.

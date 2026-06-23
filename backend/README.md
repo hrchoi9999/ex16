@@ -13,6 +13,7 @@ C:\AI_Agent\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload --
 
 - `GET /health`
 - `GET /events`
+- `GET /events/range?start=YYYY-MM-DD&end=YYYY-MM-DD`
 - `GET /events/today`
 
 The backend reuses the existing `personal_assistant` domain modules and SQLite database.

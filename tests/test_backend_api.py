@@ -21,3 +21,12 @@ def test_events_endpoint_returns_list() -> None:
 
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+def test_events_range_endpoint_returns_list() -> None:
+    client = TestClient(app)
+
+    response = client.get("/events/range?start=2026-06-01&end=2026-06-30")
+
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)

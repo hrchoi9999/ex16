@@ -1,5 +1,11 @@
 # Planner Agent Work History
 
+## Latest Migration Sprint
+
+| No | Work | Agents | Start(KST) | End(KST) | Duration | Artifacts | Verification |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-06-23-13 | Migration sprint 1: FastAPI range API and React read-only month calendar | planner_agent, lead_dev_agent, design_agent, qa_agent | 2026-06-23 11:22:00 +09:00 | 2026-06-23 11:41:29 +09:00 | 19m 29s | `backend/app/main.py`, `frontend/src/main.tsx`, `frontend/src/styles.css`, `frontend/src/vite-env.d.ts`, `tests/test_backend_api.py`, `migration/README.md`, `backend/README.md`, `frontend/README.md` | Added CORS and `GET /events/range`, connected the React PC month calendar to real schedule data, added right-panel selected-date details, preserved Streamlit legacy service, `py_compile` passed, `pytest` 35 passed, `npm run build` passed, `npm audit --omit=dev` 0 vulnerabilities, `pip check` passed |
+
 모든 작업 기록은 KST(Asia/Seoul, UTC+09:00) 기준으로 작성한다.
 
 | No | 작업 내용 | 담당 Agent | 시작일시(KST) | 종료일시(KST) | 소요시간 | 결과물 | 검증 |
