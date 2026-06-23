@@ -367,6 +367,9 @@ def inject_styles() -> None:
             display: flex !important;
             justify-content: flex-start !important;
         }
+        div[class*="st-key-nav_next"] button {
+            margin-left: 18px !important;
+        }
         div[class*="st-key-nav_prev"] button:hover,
         div[class*="st-key-nav_next"] button:hover {
             border-color: var(--primary) !important;
