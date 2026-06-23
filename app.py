@@ -519,12 +519,12 @@ def inject_styles() -> None:
             color: #7a4b00;
         }
         .event-pill.deadline {
-            color: #b91c1c;
+            color: #dc6b6b;
             border: 0;
             font-weight: 700;
         }
         .event-pill.deadline.highlight {
-            color: #991b1b;
+            color: #c94f4f;
         }
         .event-pill.seoul50plus {
             color: #60a5fa;
@@ -582,11 +582,11 @@ def inject_styles() -> None:
             animation: blink-event 1s ease-in-out infinite;
         }
         .timeline-event.deadline {
-            color: #7f1d1d;
+            color: #dc6b6b;
             font-weight: 800;
         }
         .timeline-event.deadline.highlight {
-            color: #991b1b;
+            color: #c94f4f;
         }
         .timeline-event.seoul50plus {
             color: #60a5fa;
