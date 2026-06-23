@@ -30,7 +30,7 @@ button:disabled {
 
 .shell {
   display: grid;
-  grid-template-columns: 280px minmax(720px, 1fr) 360px;
+  grid-template-columns: 280px minmax(760px, 1fr) 344px;
   min-height: 100vh;
   overflow: hidden;
 }
@@ -53,6 +53,7 @@ button:disabled {
   flex-direction: column;
   gap: 16px;
   border-left: 1px solid #dbe3ef;
+  padding: 28px 24px 28px 10px;
 }
 
 .brand-row,
@@ -786,11 +787,14 @@ button:disabled {
 
 @media (max-width: 1180px) {
   .shell {
-    grid-template-columns: 220px minmax(560px, 1fr) 320px;
+    grid-template-columns: 220px minmax(580px, 1fr) 304px;
   }
 
-  .sidebar,
-  .task-panel {
+  .sidebar {
     padding: 22px 18px;
+  }
+
+  .task-panel {
+    padding: 22px 18px 22px 8px;
   }
 }
