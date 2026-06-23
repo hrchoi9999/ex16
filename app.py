@@ -506,7 +506,7 @@ def inject_styles() -> None:
             padding: 0;
             border-radius: 0;
             background: transparent;
-            color: #4b5563;
+            color: #6b7280;
             font-size: .75rem;
             font-weight: 600;
             line-height: 1.25;
@@ -571,7 +571,7 @@ def inject_styles() -> None:
             right: 6px;
             border-left: 0;
             background: transparent;
-            color: #4b5563;
+            color: #6b7280;
             border-radius: 0;
             padding: 0 4px;
             overflow: hidden;
