@@ -10,6 +10,7 @@
 | 2026-06-23-16 | React left calendar view switcher compact UI | design_agent, lead_dev_agent, qa_agent | 2026-06-23 12:27:00 +09:00 | 2026-06-23 12:30:34 +09:00 | 3m 34s | `frontend/src/main.tsx`, `frontend/src/styles.css` | Changed left sidebar month/week/day controls from stacked wide buttons to one-line circular controls, `npm run build` passed, `pytest tests/test_backend_api.py` 5 passed |
 | 2026-06-23-17 | React font stack aligned with legacy Streamlit | design_agent, lead_dev_agent, qa_agent | 2026-06-23 13:47:00 +09:00 | 2026-06-23 13:49:49 +09:00 | 2m 49s | `frontend/src/styles.css` | Applied the legacy Streamlit font stack to React root CSS: Pretendard, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, Inter, Roboto, Arial, sans-serif. `npm run build` passed |
 | 2026-06-23-18 | React sidebar brand gradient polish | design_agent, lead_dev_agent, qa_agent | 2026-06-23 13:52:00 +09:00 | 2026-06-23 13:53:50 +09:00 | 1m 50s | `frontend/src/styles.css` | Applied a restrained blue-to-purple gradient to the React sidebar logo and service name only. `npm run build` passed |
+| 2026-06-23-19 | React right panel task title brand alignment | design_agent, lead_dev_agent, qa_agent | 2026-06-23 13:59:00 +09:00 | 2026-06-23 14:01:39 +09:00 | 2m 39s | `frontend/src/main.tsx`, `frontend/src/styles.css` | Removed the right-panel search header, moved `작업 메뉴` to the top as a gradient title aligned with the service brand style. `npm run build` passed |
 
 모든 작업 기록은 KST(Asia/Seoul, UTC+09:00) 기준으로 작성한다.
 

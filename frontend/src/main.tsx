@@ -1,6 +1,6 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bot, ExternalLink, Pencil, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Bot, ExternalLink, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import "./styles.css";
 
 type ScheduleEvent = {
@@ -522,10 +522,7 @@ function App() {
       </section>
 
       <aside className="task-panel">
-        <div className="panel-tools">
-          <Search size={18} />
-          <span>{TEXT.taskMenu}</span>
-        </div>
+        <h2 className="task-title">{TEXT.taskMenu}</h2>
         <section className="detail-panel">
           <h2>
             {formatDateKey(selectedDate)} {TEXT.detail}

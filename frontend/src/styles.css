@@ -57,7 +57,6 @@ button:disabled {
 
 .brand-row,
 .status-card,
-.panel-tools,
 .chat-card {
   display: flex;
   gap: 12px;
@@ -121,12 +120,22 @@ button:disabled {
 }
 
 .status-card,
-.panel-tools,
 .chat-card {
   border: 1px solid #d6dde8;
   border-radius: 8px;
   background: #fff;
   padding: 16px;
+}
+
+.task-title {
+  margin: 0;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  background-clip: text;
+  color: transparent;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.25;
+  -webkit-background-clip: text;
 }
 
 .account-card {
