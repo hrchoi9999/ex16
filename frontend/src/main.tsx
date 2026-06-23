@@ -152,7 +152,7 @@ const TEXT = {
   googleLinked: "\uC5F0\uB3D9\uB428",
   googleUnlinked: "\uBBF8\uC5F0\uB3D9",
   googleConnect: "Google \uACC4\uC815 \uC5F0\uB3D9",
-  googleImport: "\uCE98\uB9B0\uB354 \uB2E4\uC2DC \uAC00\uC838\uC624\uAE30",
+  googleImport: "\uCE98\uB9B0\uB354 \uAC00\uC838\uC624\uAE30",
   googleDisconnect: "\uC5F0\uB3D9 \uD574\uC81C",
   googlePrivate: "\uCD08\uB300\uB41C \uC0AC\uC6A9\uC790\uB9CC \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
   interestSites: "Interest Sites",
@@ -708,12 +708,12 @@ function App() {
           <span className={`status-dot ${googleStatus?.linked || activeUser ? "online" : ""}`} />
           <div>
             <strong>{googleStatus?.linked || activeUser ? TEXT.googleLinked : TEXT.googleUnlinked}</strong>
-            <p>{activeUser?.email || googleStatus?.email || TEXT.googleHelp}</p>
+            {googleStatus?.linked || activeUser ? null : <p>{TEXT.googleHelp}</p>}
           </div>
         </div>
         <p className="sidebar-caption">{googleStatus?.message || TEXT.googlePrivate}</p>
         {googleStatus?.linked || activeUser ? (
-          <div className="stacked-actions">
+          <div className="inline-actions">
             <button className="secondary-action" disabled={googleBusy} onClick={() => void importGoogleCalendar()}>
               {googleBusy ? TEXT.loading : TEXT.googleImport}
             </button>
