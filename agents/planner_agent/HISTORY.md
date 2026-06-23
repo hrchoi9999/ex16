@@ -15,6 +15,7 @@
 | 2026-06-23-21 | React task panel title center alignment | design_agent, lead_dev_agent, qa_agent | 2026-06-23 14:26:00 +09:00 | 2026-06-23 14:28:04 +09:00 | 2m 04s | `frontend/src/styles.css` | Center-aligned the right `작업 메뉴` title across the full task panel width so it remains centered when the section width changes. `npm run build` passed |
 | 2026-06-23-22 | React calendar header vertical spacing adjustment | design_agent, lead_dev_agent, qa_agent | 2026-06-23 15:05:00 +09:00 | 2026-06-23 15:07:00 +09:00 | 2m 00s | `frontend/src/styles.css` | Reduced the center calendar header height and subtitle top margin so the calendar grid starts closer to the side panels. `npm run build` passed |
 | 2026-06-23-23 | React calendar header final tightening | design_agent, lead_dev_agent, qa_agent | 2026-06-23 15:09:00 +09:00 | 2026-06-23 15:10:53 +09:00 | 1m 53s | `frontend/src/styles.css` | Further reduced the center calendar header height from 108px to 96px and subtitle margin from 5px to 3px to better align the calendar bottom with side sections. `npm run build` passed |
+| 2026-06-23-24 | React calendar header half-step tightening | design_agent, lead_dev_agent, qa_agent | 2026-06-23 15:13:00 +09:00 | 2026-06-23 15:14:57 +09:00 | 1m 57s | `frontend/src/styles.css` | Reduced the center calendar header by another half-step from 96px to 90px. `npm run build` passed |
 
 모든 작업 기록은 KST(Asia/Seoul, UTC+09:00) 기준으로 작성한다.
 

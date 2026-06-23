@@ -295,7 +295,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 30px;
-  min-height: 96px;
+  min-height: 90px;
   border-bottom: 1px solid #e5eaf2;
 }
 
