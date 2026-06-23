@@ -317,6 +317,7 @@ def inject_styles() -> None:
         }
         .calendar-heading {
             min-width: 150px;
+            text-align: center;
         }
         .calendar-title {
             margin: 0;
@@ -356,6 +357,14 @@ def inject_styles() -> None:
             font-size: 1.35rem !important;
             font-weight: 900 !important;
             line-height: 1 !important;
+        }
+        div[class*="st-key-nav_prev"] {
+            display: flex !important;
+            justify-content: flex-end !important;
+        }
+        div[class*="st-key-nav_next"] {
+            display: flex !important;
+            justify-content: flex-start !important;
         }
         div[class*="st-key-nav_prev"] button:hover,
         div[class*="st-key-nav_next"] button:hover {
@@ -1362,7 +1371,7 @@ def render_center(events: list[ScheduleEvent]) -> None:
     )
     previous_date = shifted_date(selected, view_mode, -1)
     next_date = shifted_date(selected, view_mode, 1)
-    nav_prev, nav_title, nav_next, _spacer = st.columns([0.05, 0.18, 0.05, 0.72], gap="small")
+    _left_spacer, nav_prev, nav_title, nav_next, _right_spacer = st.columns([1, 0.07, 0.24, 0.07, 1], gap="small")
     nav_prev.button(
         "‹",
         key=f"nav_prev_{view_mode}_{selected.isoformat()}",
