@@ -373,10 +373,16 @@ function App() {
           <strong>{TEXT.serviceName}</strong>
         </div>
         <p className="section-label">Calendar View</p>
-        <nav>
-          <button className="active">{TEXT.monthView}</button>
-          <button disabled>{TEXT.weekView}</button>
-          <button disabled>{TEXT.dayView}</button>
+        <nav className="view-switcher" aria-label="Calendar view selector">
+          <button className="active" aria-label={TEXT.monthView}>
+            {"\uC6D4"}
+          </button>
+          <button disabled aria-label={TEXT.weekView}>
+            {"\uC8FC"}
+          </button>
+          <button disabled aria-label={TEXT.dayView}>
+            {"\uC77C"}
+          </button>
         </nav>
 
         <p className="section-label">{TEXT.googleAccount}</p>

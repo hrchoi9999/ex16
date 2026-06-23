@@ -91,17 +91,27 @@ button:disabled {
   text-transform: uppercase;
 }
 
-nav {
-  display: grid;
-  gap: 12px;
+.view-switcher {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
-nav button,
+.view-switcher button {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
 .calendar-header button {
   height: 44px;
 }
 
-nav .active {
+.view-switcher .active {
   background: #0f172a;
   color: #fff;
 }
