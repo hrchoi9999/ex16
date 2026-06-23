@@ -25,3 +25,10 @@ The first migration target is the PC three-panel layout: left navigation, center
 - Edits existing events through the same right-panel form.
 - Deletes events from the selected date detail cards.
 - Refreshes the month calendar after each create/update/delete operation.
+
+## Sprint 3 Scope
+
+- Restores the left sidebar information structure.
+- Shows Google account connection status.
+- Adds interest-site candidate count, preview links, and collection trigger.
+- Adds a clickable mini calendar synchronized with the main month calendar.

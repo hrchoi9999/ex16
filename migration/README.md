@@ -39,3 +39,11 @@ Move AI Scheduler from a Streamlit monolith to a maintainable web-service struct
 - Existing events can be edited or deleted from the right detail panel.
 - Month calendar refreshes after write operations.
 - Google Calendar sync, interest-site collection, and AI chat command migration remain in later sprints.
+
+## Sprint 3 Result
+
+- FastAPI exposes active user and interest-site candidate endpoints.
+- React left sidebar now includes Google Account, Interest Sites, and Mini Calendar sections.
+- Interest-site collection can be triggered from the React sidebar.
+- Mini Calendar stays synchronized with the selected date and main month view.
+- Google OAuth flow and candidate-to-calendar registration remain in later sprints.

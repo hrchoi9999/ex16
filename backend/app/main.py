@@ -8,7 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from personal_assistant.config import settings
 from personal_assistant.database import ScheduleStore
-from personal_assistant.models import ScheduleEvent
+from personal_assistant.models import ExternalScheduleCandidate, ScheduleEvent
+from personal_assistant.site_collector import REQUESTED_SITE_SOURCES, collect_interest_sites
 
 
 app = FastAPI(title="AI Scheduler API", version="0.1.0")
@@ -43,6 +44,36 @@ class EventResponse(BaseModel):
     source: str
     source_url: str
     sync_status: str
+
+
+class UserResponse(BaseModel):
+    id: int | None
+    email: str
+    display_name: str
+    provider: str
+    linked_at: str
+    auto_sync: bool
+
+
+class CandidateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int | None
+    source: str
+    category: str
+    title: str
+    recruitment_period: str
+    url: str
+    status: str
+    collected_at: str
+    selected: bool
+
+
+class CollectionResponse(BaseModel):
+    success: bool
+    message: str
+    saved_count: int
+    candidates: list[CandidateResponse]
 
 
 class EventCreateRequest(BaseModel):
@@ -85,6 +116,12 @@ def list_events(include_past: bool = True) -> list[EventResponse]:
     return [EventResponse.model_validate(event) for event in store.list_events(include_past=include_past)]
 
 
+@app.get("/user/active", response_model=UserResponse | None)
+def active_user() -> UserResponse | None:
+    user = store.get_active_user()
+    return UserResponse.model_validate(user, from_attributes=True) if user else None
+
+
 @app.get("/events/today", response_model=list[EventResponse])
 def today_events() -> list[EventResponse]:
     today = date.today()
@@ -108,6 +145,28 @@ def events_in_range(start: date, end: date) -> list[EventResponse]:
         if event.start_at <= end_at and event.end_at >= start_at
     ]
     return [EventResponse.model_validate(event) for event in events]
+
+
+@app.get("/candidates", response_model=list[CandidateResponse])
+def list_candidates() -> list[CandidateResponse]:
+    candidates = [candidate for candidate in store.list_candidates() if candidate.source in REQUESTED_SITE_SOURCES]
+    return [CandidateResponse.model_validate(candidate) for candidate in candidates]
+
+
+@app.post("/candidates/collect", response_model=CollectionResponse)
+def collect_candidates() -> CollectionResponse:
+    result = collect_interest_sites()
+    if result.candidates:
+        store.delete_candidates_by_sources(REQUESTED_SITE_SOURCES)
+    saved_candidates: list[ExternalScheduleCandidate] = []
+    for candidate in result.candidates:
+        saved_candidates.append(store.upsert_candidate(candidate))
+    return CollectionResponse(
+        success=result.success,
+        message=result.message,
+        saved_count=len(saved_candidates),
+        candidates=[CandidateResponse.model_validate(candidate) for candidate in saved_candidates],
+    )
 
 
 @app.post("/events", response_model=EventResponse, status_code=status.HTTP_201_CREATED)

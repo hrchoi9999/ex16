@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+import backend.app.main as backend_main
 from backend.app.main import app
+from personal_assistant.models import AppUser, ExternalScheduleCandidate
+from personal_assistant.site_collector import CollectionResult
 
 
 def test_health_endpoint() -> None:
@@ -30,6 +33,72 @@ def test_events_range_endpoint_returns_list() -> None:
 
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+def test_left_sidebar_support_endpoints(monkeypatch) -> None:
+    client = TestClient(app)
+    collected: list[ExternalScheduleCandidate] = []
+
+    class FakeStore:
+        def get_active_user(self) -> AppUser:
+            return AppUser(id=1, email="tester@example.com", display_name="Tester", linked_at="2026-06-23T12:30:00")
+
+        def list_candidates(self) -> list[ExternalScheduleCandidate]:
+            return collected
+
+        def delete_candidates_by_sources(self, sources: tuple[str, ...]) -> None:
+            collected.clear()
+
+        def upsert_candidate(self, candidate: ExternalScheduleCandidate) -> ExternalScheduleCandidate:
+            saved = ExternalScheduleCandidate(
+                id=1,
+                source=candidate.source,
+                category=candidate.category,
+                title=candidate.title,
+                recruitment_period=candidate.recruitment_period,
+                url=candidate.url,
+                status=candidate.status,
+                collected_at=candidate.collected_at,
+                selected=candidate.selected,
+            )
+            collected.append(saved)
+            return saved
+
+    monkeypatch.setattr(backend_main, "store", FakeStore())
+
+    active_user_response = client.get("/user/active")
+    assert active_user_response.status_code == 200
+
+    candidates_response = client.get("/candidates")
+    assert candidates_response.status_code == 200
+    assert isinstance(candidates_response.json(), list)
+
+    def fake_collect_interest_sites() -> CollectionResult:
+        return CollectionResult(
+            True,
+            "1 candidate collected",
+            [
+                ExternalScheduleCandidate(
+                    id=None,
+                    source="K-Startup",
+                    category="모집공고",
+                    title="React migration candidate",
+                    recruitment_period="마감일자 2026-06-30",
+                    url="https://example.com/kstartup",
+                    status="모집중",
+                    collected_at="2026-06-23T12:30:00",
+                )
+            ],
+        )
+
+    monkeypatch.setattr(backend_main, "collect_interest_sites", fake_collect_interest_sites)
+    collect_response = client.post("/candidates/collect")
+
+    assert collect_response.status_code == 200
+    payload = collect_response.json()
+    assert payload["success"] is True
+    assert payload["saved_count"] == 1
+    assert payload["candidates"][0]["title"] == "React migration candidate"
 
 
 def test_event_crud_endpoints() -> None:

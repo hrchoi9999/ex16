@@ -1,6 +1,6 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bot, CalendarDays, ExternalLink, Pencil, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Bot, ExternalLink, Pencil, RefreshCw, Search, Trash2 } from "lucide-react";
 import "./styles.css";
 
 type ScheduleEvent = {
@@ -14,6 +14,27 @@ type ScheduleEvent = {
   source: string;
   source_url: string;
   sync_status: string;
+};
+
+type ActiveUser = {
+  id: number | null;
+  email: string;
+  display_name: string;
+  provider: string;
+  linked_at: string;
+  auto_sync: boolean;
+};
+
+type Candidate = {
+  id: number | null;
+  source: string;
+  category: string;
+  title: string;
+  recruitment_period: string;
+  url: string;
+  status: string;
+  collected_at: string;
+  selected: boolean;
 };
 
 type EventFormState = {
@@ -54,6 +75,16 @@ const TEXT = {
   cancel: "\uCDE8\uC18C",
   edit: "\uC218\uC815",
   delete: "\uC0AD\uC81C",
+  googleAccount: "Google Account",
+  googleHelp: "Google \uB85C\uADF8\uC778\uC73C\uB85C \uCE98\uB9B0\uB354\uB97C \uC5F0\uACB0\uD558\uC138\uC694.",
+  googleLinked: "\uC5F0\uACB0\uB428",
+  googleNext: "Google OAuth \uC791\uC5C5\uC740 \uB2E4\uC74C sprint\uC5D0\uC11C \uC774\uC2DD\uD569\uB2C8\uB2E4.",
+  interestSites: "Interest Sites",
+  collectNow: "\uAD00\uC2EC \uC0AC\uC774\uD2B8 \uC9C0\uAE08 \uC218\uC9D1",
+  collecting: "\uC218\uC9D1 \uC911...",
+  candidates: "\uC218\uC9D1 \uD6C4\uBCF4",
+  noCandidates: "\uC218\uC9D1\uB41C \uD6C4\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+  miniCalendar: "Mini Calendar",
 };
 
 function formatDateKey(date: Date): string {
@@ -165,8 +196,11 @@ function App() {
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [activeUser, setActiveUser] = useState<ActiveUser | null>(null);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [form, setForm] = useState<EventFormState>(() => newFormForDate(today));
 
@@ -197,11 +231,32 @@ function App() {
     [rangeEnd, rangeStart],
   );
 
+  const loadSidebarData = useCallback(async () => {
+    try {
+      const [userResponse, candidatesResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/user/active`),
+        fetch(`${API_BASE_URL}/candidates`),
+      ]);
+      if (userResponse.ok) {
+        setActiveUser((await userResponse.json()) as ActiveUser | null);
+      }
+      if (candidatesResponse.ok) {
+        setCandidates((await candidatesResponse.json()) as Candidate[]);
+      }
+    } catch (caught) {
+      setError((caught as Error).message);
+    }
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     void loadEvents(controller.signal);
     return () => controller.abort();
   }, [loadEvents]);
+
+  useEffect(() => {
+    void loadSidebarData();
+  }, [loadSidebarData]);
 
   useEffect(() => {
     if (editingEventId === null) {
@@ -214,6 +269,26 @@ function App() {
     return start.getFullYear() === month.getFullYear() && start.getMonth() === month.getMonth();
   });
   const selectedEvents = eventsForDay(events, selectedDate);
+  const miniDays = useMemo(() => buildMonthDays(month), [month]);
+
+  async function collectCandidates() {
+    setCollecting(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/candidates/collect`, { method: "POST" });
+      if (!response.ok) {
+        throw new Error(`API response error: ${response.status}`);
+      }
+      const payload = (await response.json()) as { message: string; candidates: Candidate[] };
+      setCandidates(payload.candidates);
+      setMessage(payload.message);
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setCollecting(false);
+    }
+  }
 
   async function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -303,10 +378,71 @@ function App() {
           <button disabled>{TEXT.weekView}</button>
           <button disabled>{TEXT.dayView}</button>
         </nav>
-        <p className="section-label">Migration</p>
-        <div className="status-card">
-          <CalendarDays size={18} />
-          <span>React calendar CRUD sprint</span>
+
+        <p className="section-label">{TEXT.googleAccount}</p>
+        <div className="account-card">
+          <span className={`status-dot ${activeUser ? "online" : ""}`} />
+          <div>
+            <strong>{activeUser?.email ?? "google-user"}</strong>
+            <p>{activeUser ? TEXT.googleLinked : TEXT.googleHelp}</p>
+          </div>
+        </div>
+        <button className="secondary-action" disabled>
+          {TEXT.googleNext}
+        </button>
+
+        <p className="section-label">{TEXT.interestSites}</p>
+        <button className="secondary-action" disabled={collecting} onClick={() => void collectCandidates()}>
+          {collecting ? TEXT.collecting : TEXT.collectNow}
+        </button>
+        <p className="sidebar-caption">
+          {candidates.length}
+          {TEXT.candidates}
+        </p>
+        <div className="candidate-preview">
+          {candidates.length === 0 ? (
+            <span>{TEXT.noCandidates}</span>
+          ) : (
+            candidates.slice(0, 3).map((candidate) => (
+              <a href={candidate.url} key={`${candidate.id ?? candidate.url}-${candidate.title}`} target="_blank" rel="noreferrer">
+                {compactTitle(candidate.title)}
+              </a>
+            ))
+          )}
+        </div>
+
+        <p className="section-label">{TEXT.miniCalendar}</p>
+        <div className="mini-calendar">
+          <strong>{monthLabel(month)}</strong>
+          <div className="mini-weekdays">
+            {WEEKDAYS.map((weekday) => (
+              <span className={weekday === "\uD1A0" || weekday === "\uC77C" ? "weekend" : ""} key={weekday}>
+                {weekday}
+              </span>
+            ))}
+          </div>
+          <div className="mini-grid">
+            {miniDays.map((day) => {
+              const inMonth = day.getMonth() === month.getMonth();
+              const selected = isSameDay(day, selectedDate);
+              const hasEvent = eventsForDay(events, day).length > 0;
+              const weekend = day.getDay() === 0 || day.getDay() === 6;
+              return (
+                <button
+                  className={`${inMonth ? "" : "muted"} ${selected ? "selected" : ""} ${hasEvent ? "has-event" : ""} ${weekend ? "weekend" : ""}`}
+                  key={`mini-${formatDateKey(day)}`}
+                  onClick={() => {
+                    setSelectedDate(day);
+                    setMonth(new Date(day.getFullYear(), day.getMonth(), 1));
+                    setEditingEventId(null);
+                    setMessage("");
+                  }}
+                >
+                  {day.getDate()}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </aside>
 

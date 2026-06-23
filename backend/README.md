@@ -18,5 +18,8 @@ C:\AI_Agent\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload --
 - `POST /events`
 - `PUT /events/{event_id}`
 - `DELETE /events/{event_id}`
+- `GET /user/active`
+- `GET /candidates`
+- `POST /candidates/collect`
 
 The backend reuses the existing `personal_assistant` domain modules and SQLite database.
