@@ -59,6 +59,8 @@ type AiChatResponse = {
   menu: string;
 };
 
+type ViewMode = "month" | "week" | "day";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const WEEKDAYS = ["\uC6D4", "\uD654", "\uC218", "\uBAA9", "\uAE08", "\uD1A0", "\uC77C"];
 const KOREAN_FIXED_HOLIDAYS = new Set(["01-01", "03-01", "05-05", "06-06", "08-15", "10-03", "10-09", "12-25"]);
@@ -152,8 +154,22 @@ function monthLabel(date: Date): string {
   return `${date.getFullYear()}\uB144 ${`${date.getMonth() + 1}`.padStart(2, "0")}\uC6D4`;
 }
 
+function dayLabel(date: Date): string {
+  return `${date.getFullYear()}\uB144 ${`${date.getMonth() + 1}`.padStart(2, "0")}\uC6D4 ${`${date.getDate()}`.padStart(2, "0")}\uC77C`;
+}
+
+function shortDateLabel(date: Date): string {
+  return `${`${date.getMonth() + 1}`.padStart(2, "0")}/${`${date.getDate()}`.padStart(2, "0")}`;
+}
+
 function addMonths(date: Date, delta: number): Date {
   return new Date(date.getFullYear(), date.getMonth() + delta, 1);
+}
+
+function addDays(date: Date, delta: number): Date {
+  const next = new Date(date);
+  next.setDate(date.getDate() + delta);
+  return next;
 }
 
 function startOfMonthGrid(date: Date): Date {
@@ -171,6 +187,18 @@ function buildMonthDays(date: Date): Date[] {
     day.setDate(start.getDate() + index);
     return day;
   });
+}
+
+function startOfWeek(date: Date): Date {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const mondayBasedDay = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - mondayBasedDay);
+  return start;
+}
+
+function buildWeekDays(date: Date): Date[] {
+  const start = startOfWeek(date);
+  return Array.from({ length: 7 }, (_, index) => addDays(start, index));
 }
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -299,6 +327,7 @@ function App() {
   const today = useMemo(() => new Date(), []);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(today);
+  const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -315,8 +344,18 @@ function App() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const monthDays = useMemo(() => buildMonthDays(month), [month]);
-  const rangeStart = formatDateKey(monthDays[0]);
-  const rangeEnd = formatDateKey(monthDays[monthDays.length - 1]);
+  const weekDays = useMemo(() => buildWeekDays(selectedDate), [selectedDate]);
+  const viewDays = useMemo(() => {
+    if (viewMode === "month") {
+      return monthDays;
+    }
+    if (viewMode === "week") {
+      return weekDays;
+    }
+    return [selectedDate];
+  }, [monthDays, selectedDate, viewMode, weekDays]);
+  const rangeStart = formatDateKey(viewDays[0]);
+  const rangeEnd = formatDateKey(viewDays[viewDays.length - 1]);
 
   const loadEvents = useCallback(
     async (signal?: AbortSignal) => {
@@ -379,11 +418,40 @@ function App() {
   }, [chatMessages, chatting]);
 
   const visibleEvents = events.filter((event) => {
-    const start = parseDateTime(event.start_at);
-    return start.getFullYear() === month.getFullYear() && start.getMonth() === month.getMonth();
+    const startKey = formatDateKey(parseDateTime(event.start_at));
+    const endKey = formatDateKey(parseDateTime(event.end_at));
+    return startKey <= rangeEnd && endKey >= rangeStart;
   });
   const selectedEvents = eventsForDay(events, selectedDate);
   const miniDays = useMemo(() => buildMonthDays(month), [month]);
+  const viewTitle = viewMode === "month" ? monthLabel(month) : viewMode === "week" ? `${shortDateLabel(weekDays[0])} - ${shortDateLabel(weekDays[6])}` : dayLabel(selectedDate);
+  const activeViewLabel = viewMode === "month" ? TEXT.monthView : viewMode === "week" ? TEXT.weekView : TEXT.dayView;
+
+  function changeView(nextMode: ViewMode) {
+    setViewMode(nextMode);
+    if (nextMode === "month") {
+      setMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+    }
+  }
+
+  function moveView(delta: number) {
+    if (viewMode === "month") {
+      const nextMonth = addMonths(month, delta);
+      setMonth(nextMonth);
+      setSelectedDate(nextMonth);
+      return;
+    }
+    const nextDate = addDays(selectedDate, viewMode === "week" ? delta * 7 : delta);
+    setSelectedDate(nextDate);
+    setMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
+  }
+
+  function selectCalendarDate(day: Date) {
+    setSelectedDate(day);
+    setMonth(new Date(day.getFullYear(), day.getMonth(), 1));
+    setEditingEventId(null);
+    setMessage("");
+  }
 
   async function collectCandidates() {
     setCollecting(true);
@@ -536,13 +604,13 @@ function App() {
         </div>
         <p className="section-label">Calendar View</p>
         <nav className="view-switcher" aria-label="Calendar view selector">
-          <button className="active" aria-label={TEXT.monthView}>
+          <button className={viewMode === "month" ? "active" : ""} aria-label={TEXT.monthView} onClick={() => changeView("month")}>
             {"\uC6D4"}
           </button>
-          <button disabled aria-label={TEXT.weekView}>
+          <button className={viewMode === "week" ? "active" : ""} aria-label={TEXT.weekView} onClick={() => changeView("week")}>
             {"\uC8FC"}
           </button>
-          <button disabled aria-label={TEXT.dayView}>
+          <button className={viewMode === "day" ? "active" : ""} aria-label={TEXT.dayView} onClick={() => changeView("day")}>
             {"\uC77C"}
           </button>
         </nav>
@@ -599,12 +667,7 @@ function App() {
                 <button
                   className={`${inMonth ? "" : "muted"} ${selected ? "selected" : ""} ${hasEvent ? "has-event" : ""} ${weekend ? "weekend" : ""}`}
                   key={`mini-${formatDateKey(day)}`}
-                  onClick={() => {
-                    setSelectedDate(day);
-                    setMonth(new Date(day.getFullYear(), day.getMonth(), 1));
-                    setEditingEventId(null);
-                    setMessage("");
-                  }}
+                  onClick={() => selectCalendarDate(day)}
                 >
                   {day.getDate()}
                 </button>
@@ -616,17 +679,17 @@ function App() {
 
       <section className="workspace">
         <header className="calendar-header">
-          <button aria-label="Previous month" onClick={() => setMonth((current) => addMonths(current, -1))}>
+          <button aria-label="Previous period" onClick={() => moveView(-1)}>
             &lsaquo;
           </button>
           <div className="calendar-heading">
-            <h1>{monthLabel(month)}</h1>
+            <h1>{viewTitle}</h1>
             <p>
-              {TEXT.monthView} · {TEXT.eventCount} {visibleEvents.length}
+              {activeViewLabel} · {TEXT.eventCount} {visibleEvents.length}
               {TEXT.items}
             </p>
           </div>
-          <button aria-label="Next month" onClick={() => setMonth((current) => addMonths(current, 1))}>
+          <button aria-label="Next period" onClick={() => moveView(1)}>
             &rsaquo;
           </button>
         </header>
@@ -639,48 +702,97 @@ function App() {
           </div>
         ) : null}
 
-        <div className="month-grid">
-          {WEEKDAYS.map((weekday) => (
-            <div className={`weekday ${weekday === "\uD1A0" || weekday === "\uC77C" ? "weekend" : ""}`} key={weekday}>
-              {weekday}
+        {viewMode === "month" ? (
+          <div className="month-grid">
+            {WEEKDAYS.map((weekday) => (
+              <div className={`weekday ${weekday === "\uD1A0" || weekday === "\uC77C" ? "weekend" : ""}`} key={weekday}>
+                {weekday}
+              </div>
+            ))}
+            {monthDays.map((day) => {
+              const dayEvents = eventsForDay(events, day);
+              const inMonth = day.getMonth() === month.getMonth();
+              const selected = isSameDay(day, selectedDate);
+              const weekend = day.getDay() === 0 || day.getDay() === 6;
+              return (
+                <button
+                  className={`day-cell ${inMonth ? "" : "muted"} ${selected ? "selected" : ""}`}
+                  key={formatDateKey(day)}
+                  onClick={() => selectCalendarDate(day)}
+                >
+                  <span className={`day-number ${weekend ? "weekend" : ""}`}>
+                    {day.getDate()}
+                    {isSameDay(day, today) ? ` ${TEXT.today}` : ""}
+                  </span>
+                  <span className="day-events">
+                    {dayEvents.slice(0, 4).map((event) => (
+                      <span className={`event-line ${eventTone(event)}`} key={`${event.id ?? event.source_url}-${event.title}`}>
+                        {compactTitle(event.title)}
+                      </span>
+                    ))}
+                    {dayEvents.length > 4 ? (
+                      <span className="more-line">
+                        +{dayEvents.length - 4}
+                        {TEXT.items}
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : viewMode === "week" ? (
+          <div className="week-board">
+            {weekDays.map((day) => {
+              const dayEvents = eventsForDay(events, day);
+              const selected = isSameDay(day, selectedDate);
+              const weekend = isWeekendDate(day);
+              return (
+                <button
+                  className={`week-column ${selected ? "selected" : ""} ${weekend ? "weekend" : ""}`}
+                  key={`week-${formatDateKey(day)}`}
+                  onClick={() => selectCalendarDate(day)}
+                >
+                  <span className="week-column-date">
+                    {WEEKDAYS[(day.getDay() + 6) % 7]} {shortDateLabel(day)}
+                    {isSameDay(day, today) ? ` ${TEXT.today}` : ""}
+                  </span>
+                  <span className="week-column-events">
+                    {dayEvents.length === 0 ? (
+                      <span className="week-empty">{TEXT.selectedDayEmpty}</span>
+                    ) : (
+                      dayEvents.map((event) => (
+                        <span className={`event-line ${eventTone(event)}`} key={`${event.id ?? event.source_url}-${event.title}`}>
+                          {compactTitle(event.title)}
+                        </span>
+                      ))
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="day-board">
+            <div className={`day-board-header ${isWeekendDate(selectedDate) ? "weekend" : ""}`}>{dayLabel(selectedDate)}</div>
+            <div className="day-timeline">
+              {selectedEvents.length === 0 ? (
+                <p className="empty">{TEXT.selectedDayEmpty}</p>
+              ) : (
+                selectedEvents.map((event) => (
+                  <article className={`day-timeline-event ${eventTone(event)}`} key={`day-${event.id ?? event.source_url}-${event.title}`}>
+                    <span>
+                      {parseDateTime(event.start_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} -{" "}
+                      {parseDateTime(event.end_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <strong>{event.title}</strong>
+                    {event.description ? <p>{event.description}</p> : null}
+                  </article>
+                ))
+              )}
             </div>
-          ))}
-          {monthDays.map((day) => {
-            const dayEvents = eventsForDay(events, day);
-            const inMonth = day.getMonth() === month.getMonth();
-            const selected = isSameDay(day, selectedDate);
-            const weekend = day.getDay() === 0 || day.getDay() === 6;
-            return (
-              <button
-                className={`day-cell ${inMonth ? "" : "muted"} ${selected ? "selected" : ""}`}
-                key={formatDateKey(day)}
-                onClick={() => {
-                  setSelectedDate(day);
-                  setEditingEventId(null);
-                  setMessage("");
-                }}
-              >
-                <span className={`day-number ${weekend ? "weekend" : ""}`}>
-                  {day.getDate()}
-                  {isSameDay(day, today) ? ` ${TEXT.today}` : ""}
-                </span>
-                <span className="day-events">
-                  {dayEvents.slice(0, 4).map((event) => (
-                    <span className={`event-line ${eventTone(event)}`} key={`${event.id ?? event.source_url}-${event.title}`}>
-                      {compactTitle(event.title)}
-                    </span>
-                  ))}
-                  {dayEvents.length > 4 ? (
-                    <span className="more-line">
-                      +{dayEvents.length - 4}
-                      {TEXT.items}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+          </div>
+        )}
       </section>
 
       <aside className="task-panel">
