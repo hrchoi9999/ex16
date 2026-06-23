@@ -31,3 +31,11 @@ Move AI Scheduler from a Streamlit monolith to a maintainable web-service struct
 - The React month calendar reads real SQLite-backed schedule data through FastAPI.
 - Date selection updates the right detail panel without Streamlit reruns.
 - Current React scope is read-only; create/update/delete, Google sync, site collection, and AI chat migration remain in later sprints.
+
+## Sprint 2 Result
+
+- FastAPI now supports local schedule create/update/delete.
+- React right panel now includes selected-date event creation.
+- Existing events can be edited or deleted from the right detail panel.
+- Month calendar refreshes after write operations.
+- Google Calendar sync, interest-site collection, and AI chat command migration remain in later sprints.

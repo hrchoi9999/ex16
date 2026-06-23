@@ -170,6 +170,12 @@ nav .active {
   color: #b91c1c;
 }
 
+.notice.success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
 .month-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -325,11 +331,81 @@ nav .active {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  margin-top: 12px;
   color: #2563eb;
   font-size: 0.88rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.card-actions,
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.card-actions button,
+.form-actions button {
+  display: inline-flex;
+  min-height: 36px;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  color: #334155;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.card-actions .danger-button {
+  color: #b91c1c;
+}
+
+.event-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+}
+
+.event-form h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.event-form label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.event-form input,
+.event-form textarea {
+  width: 100%;
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.event-form textarea {
+  resize: vertical;
+}
+
+.form-actions button[type="submit"] {
+  flex: 1 1 160px;
+  background: #0f172a;
+  color: #fff;
 }
 
 .chat-card {

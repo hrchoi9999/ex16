@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bot, CalendarDays, ExternalLink, RefreshCw, Search } from "lucide-react";
+import { Bot, CalendarDays, ExternalLink, Pencil, RefreshCw, Search, Trash2 } from "lucide-react";
 import "./styles.css";
 
 type ScheduleEvent = {
@@ -14,6 +14,15 @@ type ScheduleEvent = {
   source: string;
   source_url: string;
   sync_status: string;
+};
+
+type EventFormState = {
+  title: string;
+  start_at: string;
+  end_at: string;
+  description: string;
+  location: string;
+  importance: number;
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -32,6 +41,19 @@ const TEXT = {
   eventCount: "\uC77C\uC815",
   items: "\uAC1C",
   aiNext: "AI \uCC44\uD305 \uC5F0\uACB0\uC740 \uB2E4\uC74C sprint\uC5D0\uC11C \uC774\uC2DD\uD569\uB2C8\uB2E4.",
+  createTitle: "\uC120\uD0DD \uB0A0\uC9DC \uC77C\uC815 \uB4F1\uB85D",
+  editTitle: "\uC77C\uC815 \uC218\uC815",
+  title: "\uC81C\uBAA9",
+  startAt: "\uC2DC\uC791",
+  endAt: "\uC885\uB8CC",
+  location: "\uC7A5\uC18C",
+  importance: "\uC911\uC694\uB3C4",
+  description: "\uC124\uBA85",
+  save: "\uC77C\uC815 \uB4F1\uB85D",
+  update: "\uC218\uC815 \uC800\uC7A5",
+  cancel: "\uCDE8\uC18C",
+  edit: "\uC218\uC815",
+  delete: "\uC0AD\uC81C",
 };
 
 function formatDateKey(date: Date): string {
@@ -99,48 +121,174 @@ function compactTitle(title: string): string {
   return title.length > 38 ? `${title.slice(0, 37)}...` : title;
 }
 
+function toDateTimeLocalValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hour = `${date.getHours()}`.padStart(2, "0");
+  const minute = `${date.getMinutes()}`.padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function newFormForDate(date: Date): EventFormState {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 9, 0, 0);
+  const end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 10, 0, 0);
+  return {
+    title: "",
+    start_at: toDateTimeLocalValue(start),
+    end_at: toDateTimeLocalValue(end),
+    description: "",
+    location: "",
+    importance: 3,
+  };
+}
+
+function formFromEvent(event: ScheduleEvent): EventFormState {
+  return {
+    title: event.title,
+    start_at: toDateTimeLocalValue(parseDateTime(event.start_at)),
+    end_at: toDateTimeLocalValue(parseDateTime(event.end_at)),
+    description: event.description,
+    location: event.location,
+    importance: event.importance,
+  };
+}
+
+function apiDateTime(value: string): string {
+  return value.length === 16 ? `${value}:00` : value;
+}
+
 function App() {
   const today = useMemo(() => new Date(), []);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(today);
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [form, setForm] = useState<EventFormState>(() => newFormForDate(today));
 
   const monthDays = useMemo(() => buildMonthDays(month), [month]);
   const rangeStart = formatDateKey(monthDays[0]);
   const rangeEnd = formatDateKey(monthDays[monthDays.length - 1]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError("");
-
-    fetch(`${API_BASE_URL}/events/range?start=${rangeStart}&end=${rangeEnd}`, {
-      signal: controller.signal,
-    })
-      .then((response) => {
+  const loadEvents = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setError("");
+      try {
+        const response = await fetch(`${API_BASE_URL}/events/range?start=${rangeStart}&end=${rangeEnd}`, { signal });
         if (!response.ok) {
           throw new Error(`API response error: ${response.status}`);
         }
-        return response.json() as Promise<ScheduleEvent[]>;
-      })
-      .then(setEvents)
-      .catch((caught: Error) => {
-        if (caught.name !== "AbortError") {
-          setError(caught.message);
+        const payload = (await response.json()) as ScheduleEvent[];
+        setEvents(payload);
+      } catch (caught) {
+        const errorObject = caught as Error;
+        if (errorObject.name !== "AbortError") {
+          setError(errorObject.message);
         }
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [rangeEnd, rangeStart],
+  );
 
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadEvents(controller.signal);
     return () => controller.abort();
-  }, [rangeStart, rangeEnd]);
+  }, [loadEvents]);
+
+  useEffect(() => {
+    if (editingEventId === null) {
+      setForm(newFormForDate(selectedDate));
+    }
+  }, [editingEventId, selectedDate]);
 
   const visibleEvents = events.filter((event) => {
     const start = parseDateTime(event.start_at);
     return start.getFullYear() === month.getFullYear() && start.getMonth() === month.getMonth();
   });
   const selectedEvents = eventsForDay(events, selectedDate);
+
+  async function submitForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setMessage("");
+
+    const payload = {
+      title: form.title.trim(),
+      start_at: apiDateTime(form.start_at),
+      end_at: apiDateTime(form.end_at),
+      description: form.description.trim(),
+      location: form.location.trim(),
+      importance: Number(form.importance),
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/events${editingEventId === null ? "" : `/${editingEventId}`}`, {
+        method: editingEventId === null ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error(`API response error: ${response.status}`);
+      }
+      const saved = (await response.json()) as ScheduleEvent;
+      const savedDate = parseDateTime(saved.start_at);
+      setSelectedDate(savedDate);
+      setMonth(new Date(savedDate.getFullYear(), savedDate.getMonth(), 1));
+      setEditingEventId(null);
+      setForm(newFormForDate(savedDate));
+      setMessage(editingEventId === null ? "\uC77C\uC815\uC744 \uB4F1\uB85D\uD588\uC2B5\uB2C8\uB2E4." : "\uC77C\uC815\uC744 \uC218\uC815\uD588\uC2B5\uB2C8\uB2E4.");
+      await loadEvents();
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteEvent(eventId: number) {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/events/${eventId}`, { method: "DELETE" });
+      if (!response.ok) {
+        throw new Error(`API response error: ${response.status}`);
+      }
+      if (editingEventId === eventId) {
+        setEditingEventId(null);
+        setForm(newFormForDate(selectedDate));
+      }
+      setMessage("\uC77C\uC815\uC744 \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.");
+      await loadEvents();
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function startEditing(event: ScheduleEvent) {
+    if (event.id === null) {
+      return;
+    }
+    setEditingEventId(event.id);
+    setForm(formFromEvent(event));
+    setMessage("");
+  }
+
+  function cancelEditing() {
+    setEditingEventId(null);
+    setForm(newFormForDate(selectedDate));
+  }
 
   return (
     <main className="shell">
@@ -158,7 +306,7 @@ function App() {
         <p className="section-label">Migration</p>
         <div className="status-card">
           <CalendarDays size={18} />
-          <span>React read-only calendar</span>
+          <span>React calendar CRUD sprint</span>
         </div>
       </aside>
 
@@ -180,6 +328,7 @@ function App() {
         </header>
 
         {error ? <div className="notice error">{error}</div> : null}
+        {message ? <div className="notice success">{message}</div> : null}
         {loading ? (
           <div className="notice">
             <RefreshCw size={16} /> {TEXT.loading}
@@ -201,7 +350,11 @@ function App() {
               <button
                 className={`day-cell ${inMonth ? "" : "muted"} ${selected ? "selected" : ""}`}
                 key={formatDateKey(day)}
-                onClick={() => setSelectedDate(day)}
+                onClick={() => {
+                  setSelectedDate(day);
+                  setEditingEventId(null);
+                  setMessage("");
+                }}
               >
                 <span className={`day-number ${weekend ? "weekend" : ""}`}>
                   {day.getDate()}
@@ -246,14 +399,91 @@ function App() {
                   {event.source}
                 </p>
                 {event.description ? <p>{event.description}</p> : null}
-                {event.source_url ? (
-                  <a href={event.source_url} target="_blank" rel="noreferrer">
-                    {TEXT.openUrl} <ExternalLink size={14} />
-                  </a>
-                ) : null}
+                <div className="card-actions">
+                  {event.source_url ? (
+                    <a href={event.source_url} target="_blank" rel="noreferrer">
+                      {TEXT.openUrl} <ExternalLink size={14} />
+                    </a>
+                  ) : null}
+                  {event.id !== null ? (
+                    <>
+                      <button type="button" onClick={() => startEditing(event)}>
+                        <Pencil size={14} /> {TEXT.edit}
+                      </button>
+                      <button type="button" className="danger-button" onClick={() => void deleteEvent(event.id as number)}>
+                        <Trash2 size={14} /> {TEXT.delete}
+                      </button>
+                    </>
+                  ) : null}
+                </div>
               </article>
             ))
           )}
+
+          <form className="event-form" onSubmit={(event) => void submitForm(event)}>
+            <h3>{editingEventId === null ? TEXT.createTitle : TEXT.editTitle}</h3>
+            <label>
+              {TEXT.title}
+              <input
+                required
+                value={form.title}
+                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              />
+            </label>
+            <label>
+              {TEXT.startAt}
+              <input
+                required
+                type="datetime-local"
+                value={form.start_at}
+                onChange={(event) => setForm((current) => ({ ...current, start_at: event.target.value }))}
+              />
+            </label>
+            <label>
+              {TEXT.endAt}
+              <input
+                required
+                type="datetime-local"
+                value={form.end_at}
+                onChange={(event) => setForm((current) => ({ ...current, end_at: event.target.value }))}
+              />
+            </label>
+            <label>
+              {TEXT.location}
+              <input
+                value={form.location}
+                onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
+              />
+            </label>
+            <label>
+              {TEXT.importance}
+              <input
+                min={1}
+                max={5}
+                type="number"
+                value={form.importance}
+                onChange={(event) => setForm((current) => ({ ...current, importance: Number(event.target.value) }))}
+              />
+            </label>
+            <label>
+              {TEXT.description}
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+              />
+            </label>
+            <div className="form-actions">
+              <button type="submit" disabled={saving}>
+                {editingEventId === null ? TEXT.save : TEXT.update}
+              </button>
+              {editingEventId !== null ? (
+                <button type="button" disabled={saving} onClick={cancelEditing}>
+                  {TEXT.cancel}
+                </button>
+              ) : null}
+            </div>
+          </form>
         </section>
         <div className="chat-card">
           <Bot size={18} />
