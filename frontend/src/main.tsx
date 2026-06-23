@@ -61,6 +61,39 @@ type AiChatResponse = {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const WEEKDAYS = ["\uC6D4", "\uD654", "\uC218", "\uBAA9", "\uAE08", "\uD1A0", "\uC77C"];
+const KOREAN_FIXED_HOLIDAYS = new Set(["01-01", "03-01", "05-05", "06-06", "08-15", "10-03", "10-09", "12-25"]);
+const KNOWN_PUBLIC_HOLIDAYS = new Set([
+  "2026-01-01",
+  "2026-02-16",
+  "2026-02-17",
+  "2026-02-18",
+  "2026-03-02",
+  "2026-05-05",
+  "2026-05-25",
+  "2026-06-03",
+  "2026-06-06",
+  "2026-08-15",
+  "2026-09-24",
+  "2026-09-25",
+  "2026-09-26",
+  "2026-10-05",
+  "2026-10-09",
+  "2026-12-25",
+]);
+const HOLIDAY_KEYWORDS = [
+  "\uACF5\uD734\uC77C",
+  "\uD734\uC77C",
+  "\uC124\uB0A0",
+  "\uCD94\uC11D",
+  "\uC5B4\uB9B0\uC774\uB0A0",
+  "\uBD80\uCC98\uB2D8",
+  "\uD604\uCDA9\uC77C",
+  "\uAD11\uBCF5\uC808",
+  "\uAC1C\uCC9C\uC808",
+  "\uD55C\uAE00\uB0A0",
+  "\uC131\uD0C4\uC808",
+  "\uC120\uAC70\uC77C",
+];
 const TEXT = {
   serviceName: "\uAC1C\uC778 \uC77C\uC815 \uAD00\uB9AC",
   monthView: "\uC6D4 \uBCF4\uAE30",
@@ -145,11 +178,67 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 function eventsForDay(events: ScheduleEvent[], day: Date): ScheduleEvent[] {
-  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0);
-  const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59);
+  const holidayDates = holidayDatesFromEvents(events);
   return events
-    .filter((event) => parseDateTime(event.start_at) <= dayEnd && parseDateTime(event.end_at) >= dayStart)
+    .filter((event) => shouldShowEventOnDay(event, day, holidayDates))
     .sort((a, b) => parseDateTime(a.start_at).getTime() - parseDateTime(b.start_at).getTime());
+}
+
+function shouldShowEventOnDay(event: ScheduleEvent, day: Date, holidayDates: Set<string>): boolean {
+  const dayKey = formatDateKey(day);
+  const startKey = formatDateKey(parseDateTime(event.start_at));
+  const endKey = formatDateKey(parseDateTime(event.end_at));
+  if (dayKey < startKey || dayKey > endKey) {
+    return false;
+  }
+  if (startKey === endKey) {
+    return true;
+  }
+  if (isHolidayEvent(event) || isDeadlineEvent(event)) {
+    return true;
+  }
+  return isBusinessDay(day, holidayDates);
+}
+
+function isDeadlineEvent(event: ScheduleEvent): boolean {
+  return event.title.startsWith("[\uB9C8\uAC10]") || Boolean(event.source_url);
+}
+
+function isHolidayEvent(event: ScheduleEvent): boolean {
+  const haystack = `${event.title} ${event.description} ${event.location} ${event.source}`.toLowerCase();
+  return HOLIDAY_KEYWORDS.some((keyword) => haystack.includes(keyword.toLowerCase()));
+}
+
+function holidayDatesFromEvents(events: ScheduleEvent[]): Set<string> {
+  const dates = new Set<string>();
+  for (const event of events) {
+    if (!isHolidayEvent(event)) {
+      continue;
+    }
+    const current = parseDateTime(event.start_at);
+    const end = parseDateTime(event.end_at);
+    const day = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    while (day <= last) {
+      dates.add(formatDateKey(day));
+      day.setDate(day.getDate() + 1);
+    }
+  }
+  return dates;
+}
+
+function isBusinessDay(day: Date, holidayDates: Set<string>): boolean {
+  return !isWeekendDate(day) && !isKnownHoliday(day, holidayDates);
+}
+
+function isWeekendDate(day: Date): boolean {
+  return day.getDay() === 0 || day.getDay() === 6;
+}
+
+function isKnownHoliday(day: Date, holidayDates: Set<string>): boolean {
+  const key = formatDateKey(day);
+  const monthDay = key.slice(5);
+  return holidayDates.has(key) || KOREAN_FIXED_HOLIDAYS.has(monthDay) || KNOWN_PUBLIC_HOLIDAYS.has(key);
 }
 
 function eventTone(event: ScheduleEvent): string {
