@@ -63,3 +63,31 @@ Google Calendar 연동 방식:
 - `Google에서 확인하지 않은 앱` 경고가 나오면 개발/테스트 단계에서는 관리자가 테스트 사용자 Gmail을 등록하고, 사용자는 `고급`을 눌러 앱으로 계속 이동한다. 실제 외부 배포 전에는 Google OAuth 앱 검증이 필요하다.
 
 관리자/사용자 역할과 최초 실행, 회원 가입, 회원 로그인 프로세스는 `agents/integration_agent/GOOGLE_OAUTH_PROCESS.md`에서 관리한다.
+
+## FastAPI + React Migration
+
+현재 운영 화면은 Streamlit legacy 버전이다. React 전환을 위해 다음 구조를 병렬로 준비했다.
+
+```text
+legacy_streamlit/   현재 Streamlit 앱 본체
+app.py              기존 streamlit 실행 명령 호환용 entrypoint
+personal_assistant/ 공유 Python 도메인 모듈
+backend/            FastAPI API 서버 scaffold
+frontend/           React + Vite PC UI scaffold
+migration/          migration 계획 문서
+```
+
+FastAPI 개발 서버:
+
+```powershell
+cd C:\AI_Agent\ex16
+C:\AI_Agent\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload --port 8000
+```
+
+React 개발 서버:
+
+```powershell
+cd C:\AI_Agent\ex16\frontend
+npm.cmd install
+npm.cmd run dev
+```

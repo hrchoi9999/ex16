@@ -1,0 +1,24 @@
+# Streamlit to FastAPI + React Migration
+
+## Goal
+
+Move AI Scheduler from a Streamlit monolith to a maintainable web-service structure.
+
+## Folder Strategy
+
+- `legacy_streamlit/`: current working Streamlit app, preserved for reference and fallback.
+- `personal_assistant/`: shared Python domain modules, reused by both Streamlit and FastAPI.
+- `backend/`: new FastAPI API layer.
+- `frontend/`: new React PC web UI.
+
+## Migration Order
+
+1. Keep Streamlit running through root `app.py` compatibility entrypoint.
+2. Add FastAPI health and schedule read APIs.
+3. Build React three-panel PC shell.
+4. Connect React calendar read-only data.
+5. Add event create/update/delete.
+6. Add Google Calendar import/sync.
+7. Add interest-site collection and deadline registration.
+8. Add AI chat command router.
+9. Retire Streamlit once React reaches feature parity.

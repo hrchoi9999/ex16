@@ -1,0 +1,115 @@
+:root {
+  color: #0f172a;
+  background: #f8fafc;
+  font-family: Inter, Pretendard, Roboto, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button {
+  border: 1px solid #d6dde8;
+  background: #fff;
+  border-radius: 8px;
+  color: #0f172a;
+  cursor: pointer;
+  font: inherit;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 360px;
+  min-height: 100vh;
+}
+
+.sidebar,
+.task-panel {
+  background: #eaf2ff;
+  border-right: 1px solid #dbe3ef;
+  padding: 28px 24px;
+}
+
+.task-panel {
+  border-left: 1px solid #dbe3ef;
+  border-right: 0;
+}
+
+.brand-mark {
+  display: inline-grid;
+  width: 48px;
+  height: 48px;
+  margin-right: 12px;
+  place-items: center;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 900;
+}
+
+nav {
+  display: grid;
+  gap: 12px;
+  margin-top: 36px;
+}
+
+nav button,
+.calendar-header button {
+  height: 44px;
+}
+
+nav .active {
+  background: #0f172a;
+  color: #fff;
+}
+
+.workspace {
+  background: #fff;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  height: 132px;
+  border-bottom: 1px solid #e5eaf2;
+}
+
+.calendar-header h1 {
+  min-width: 220px;
+  margin: 0;
+  text-align: center;
+}
+
+.calendar-header button {
+  width: 52px;
+}
+
+.calendar-placeholder {
+  display: grid;
+  min-height: 460px;
+  place-items: center;
+  align-content: center;
+  gap: 16px;
+  color: #64748b;
+}
+
+.panel-tools,
+.chat-card {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+}
+
+.chat-card {
+  margin-top: 18px;
+}

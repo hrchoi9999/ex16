@@ -44,3 +44,20 @@ APP_TIMEZONE=Asia/Seoul
 ```
 
 The target Google Calendar must grant access to the service account email, or API calls will fail with a permission error.
+
+## Migration Dev Servers
+
+FastAPI backend:
+
+```powershell
+cd C:\AI_Agent\ex16
+C:\AI_Agent\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload --port 8000
+```
+
+React frontend:
+
+```powershell
+cd C:\AI_Agent\ex16\frontend
+npm.cmd install
+npm.cmd run dev
+```
