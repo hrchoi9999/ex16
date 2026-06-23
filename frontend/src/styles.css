@@ -65,9 +65,12 @@ button:disabled {
 }
 
 .brand-row strong {
-  color: #2563eb;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  background-clip: text;
+  color: transparent;
   font-size: 1.35rem;
   font-weight: 800;
+  -webkit-background-clip: text;
 }
 
 .brand-mark {
@@ -77,7 +80,8 @@ button:disabled {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 10px;
-  background: #2563eb;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  box-shadow: 0 10px 22px rgb(37 99 235 / 18%);
   color: #fff;
   font-weight: 900;
 }
