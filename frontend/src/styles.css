@@ -684,7 +684,14 @@ button:disabled {
   white-space: pre-wrap;
 }
 
-.card-actions,
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
 .form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -693,7 +700,23 @@ button:disabled {
   margin-top: 12px;
 }
 
-.card-actions button,
+.card-actions a,
+.card-actions button {
+  display: inline-flex;
+  min-height: 36px;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 6px;
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .form-actions button {
   display: inline-flex;
   min-height: 36px;

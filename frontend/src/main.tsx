@@ -1,6 +1,6 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bot, ExternalLink, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { Bot, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import "./styles.css";
 
 type ScheduleEvent = {
@@ -124,7 +124,7 @@ const TEXT = {
   loading: "\uC77C\uC815\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.",
   selectedDayEmpty: "\uC120\uD0DD\uD55C \uB0A0\uC9DC\uC5D0 \uC77C\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
   detail: "\uC0C1\uC138",
-  openUrl: "\uC6D0\uBB38 URL \uC5F4\uAE30",
+  openUrl: "\uC5F0\uACB0 URL",
   taskMenu: "\uC791\uC5C5 \uBA54\uB274",
   today: "\uC624\uB298",
   eventCount: "\uC77C\uC815",
@@ -308,6 +308,14 @@ function eventTone(event: ScheduleEvent): string {
 
 function compactTitle(title: string): string {
   return title.length > 38 ? `${title.slice(0, 37)}...` : title;
+}
+
+function displayEventDescription(description: string): string {
+  return description
+    .replace(/URL\s*:\s*https?:\/\/\S+/gi, "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function toDateTimeLocalValue(date: Date): string {
@@ -913,33 +921,36 @@ function App() {
           {selectedEvents.length === 0 ? (
             <p className="empty">{TEXT.selectedDayEmpty}</p>
           ) : (
-            selectedEvents.map((event) => (
-              <article className="detail-card" key={`${event.id ?? event.source_url}-${event.title}`}>
-                <strong className={eventTone(event)}>{event.title}</strong>
-                <p>
-                  {parseDateTime(event.start_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} ·{" "}
-                  {event.source}
-                </p>
-                {event.description ? <p>{event.description}</p> : null}
-                <div className="card-actions">
-                  {event.source_url ? (
-                    <a href={event.source_url} target="_blank" rel="noreferrer">
-                      {TEXT.openUrl} <ExternalLink size={14} />
-                    </a>
-                  ) : null}
-                  {event.id !== null ? (
-                    <>
-                      <button type="button" onClick={() => startEditing(event)}>
-                        <Pencil size={14} /> {TEXT.edit}
-                      </button>
-                      <button type="button" className="danger-button" onClick={() => void deleteEvent(event.id as number)}>
-                        <Trash2 size={14} /> {TEXT.delete}
-                      </button>
-                    </>
-                  ) : null}
-                </div>
-              </article>
-            ))
+            selectedEvents.map((event) => {
+              const visibleDescription = displayEventDescription(event.description);
+              return (
+                <article className="detail-card" key={`${event.id ?? event.source_url}-${event.title}`}>
+                  <strong className={eventTone(event)}>{event.title}</strong>
+                  <p>
+                    {parseDateTime(event.start_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} ·{" "}
+                    {event.source}
+                  </p>
+                  {visibleDescription ? <p>{visibleDescription}</p> : null}
+                  <div className="card-actions">
+                    {event.source_url ? (
+                      <a href={event.source_url} target="_blank" rel="noreferrer">
+                        {TEXT.openUrl}
+                      </a>
+                    ) : null}
+                    {event.id !== null ? (
+                      <>
+                        <button type="button" onClick={() => startEditing(event)}>
+                          <Pencil size={14} /> {TEXT.edit}
+                        </button>
+                        <button type="button" className="danger-button" onClick={() => void deleteEvent(event.id as number)}>
+                          <Trash2 size={14} /> {TEXT.delete}
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })
           )}
 
           <form className="event-form" onSubmit={(event) => void submitForm(event)}>
