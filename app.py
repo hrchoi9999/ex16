@@ -316,13 +316,14 @@ def inject_styles() -> None:
             gap: 10px;
         }
         .calendar-heading {
-            min-width: 150px;
+            min-width: 220px;
             text-align: center;
         }
         .calendar-title {
             margin: 0;
             font-size: 24px;
             font-weight: 760;
+            white-space: nowrap;
         }
         .calendar-subtitle {
             margin: 6px 0 0;
@@ -1371,7 +1372,7 @@ def render_center(events: list[ScheduleEvent]) -> None:
     )
     previous_date = shifted_date(selected, view_mode, -1)
     next_date = shifted_date(selected, view_mode, 1)
-    _left_spacer, nav_prev, nav_title, nav_next, _right_spacer = st.columns([1, 0.07, 0.24, 0.07, 1], gap="small")
+    _left_spacer, nav_prev, nav_title, nav_next, _right_spacer = st.columns([1, 0.08, 0.46, 0.08, 1], gap="small")
     nav_prev.button(
         "‹",
         key=f"nav_prev_{view_mode}_{selected.isoformat()}",
